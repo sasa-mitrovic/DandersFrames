@@ -47,6 +47,10 @@
 * Fix Aura Designer not detecting auras hidden by Blizzard's frames (e.g., Symbiotic Relationship) — now scans units directly via C_UnitAuras API instead of reading from Blizzard's aura cache
 * Fix non-defensive buffs appearing in the Defensive Bar when units are out of range — added post-validation to filter out misclassified auras
 * Fix aura filter settings persisting when switching profiles — filter strings are now rebuilt on profile change
+* Fix Aura Designer indicators showing wrong spells during boss fights — removed stale instanceId cache fallback, tracked auras are on Blizzard's whitelist so secret fallback is unnecessary
+* Fix Aura Designer icons and squares getting stuck after auras expire — stale aura data and cooldowns are now cleared on hide, matching existing bar cleanup
+* Fix Aura Designer tooltip crash when hovering indicator icons — removed legacy index-based tooltip fallback that passed invalid index=0
+* Fix Aura Designer buff bar dedup not working for frame-level indicators (border, health bar color, name text) — dedup set now includes all indicator types
 
 ## [4.0.6] - 2026-02-15
 
