@@ -293,6 +293,21 @@ end
 -- ============================================================
 
 function Indicators:Apply(frame, typeKey, config, auraData, defaults, auraName, priority)
+    -- Validate aura still exists and matches expectations before rendering.
+    -- Mirrors the defensive bar post-validation pattern (commit 7b141a8).
+    local unit = frame.unit
+    local auraID = auraData and auraData.auraInstanceID
+    if auraID then
+        -- Secret auraInstanceID = stale cache hit from a different aura
+        if issecretvalue(auraID) then return end
+
+        -- Verify the aura still exists on this unit
+        if unit and GetAuraDataByAuraInstanceID then
+            local live = GetAuraDataByAuraInstanceID(unit, auraID)
+            if not live then return end
+        end
+    end
+
     if typeKey == "border" then
         self:ApplyBorder(frame, config, auraData)
     elseif typeKey == "healthbar" then
@@ -897,7 +912,7 @@ function Indicators:ApplyIcon(frame, config, auraData, defaults, auraName, prior
     -- Store aura data for tooltip lookups (parent-driven via ShowDFAuraTooltip)
     if auraData then
         if not icon.auraData then
-            icon.auraData = { index = 0, auraInstanceID = nil }
+            icon.auraData = { auraInstanceID = nil }
         end
         icon.auraData.auraInstanceID = auraData.auraInstanceID
     end
@@ -1184,6 +1199,13 @@ function Indicators:HideUnusedIcons(frame, activeMap)
         if not activeMap[auraName] then
             UnregisterExpiring(icon)
             icon:Hide()
+            -- Clear stale aura data (matches bar cleanup pattern)
+            if icon.auraData then
+                icon.auraData.auraInstanceID = nil
+            end
+            if icon.cooldown then
+                icon.cooldown:Hide()
+            end
         end
     end
 end
@@ -1506,6 +1528,10 @@ function Indicators:HideUnusedSquares(frame, activeMap)
         if not activeMap[auraName] then
             UnregisterExpiring(sq)
             sq:Hide()
+            -- Clear stale cooldown (matches bar cleanup pattern)
+            if sq.cooldown then
+                sq.cooldown:Hide()
+            end
         end
     end
 end

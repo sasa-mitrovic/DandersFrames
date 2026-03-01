@@ -20,6 +20,7 @@ local addonName, DF = ...
 -- ============================================================
 
 local pairs, ipairs, type = pairs, ipairs, type
+local wipe = table.wipe or wipe
 local GetTime = GetTime
 local issecretvalue = issecretvalue or function() return false end
 local GetAuraDataByAuraInstanceID = C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID
@@ -74,8 +75,17 @@ end
 
 -- Persistent cache: auraInstanceID → auraName
 -- Populated when spellId is non-secret, used in combat when spellId is secret.
--- auraInstanceIDs are monotonically increasing and never reused within a session.
+-- Wiped on combat end (PLAYER_REGEN_ENABLED) so stale entries don't persist;
+-- the cache rebuilds naturally on the next out-of-combat scan.
 local instanceIdToAuraName = {}  -- { [auraInstanceID] = auraName }
+
+-- Wipe the instance cache when leaving combat — spell IDs become
+-- non-secret again so the cache will rebuild from fresh data.
+local cacheFrame = CreateFrame("Frame")
+cacheFrame:RegisterEvent("PLAYER_REGEN_ENABLED")
+cacheFrame:SetScript("OnEvent", function()
+    wipe(instanceIdToAuraName)
+end)
 
 -- Debug throttle for adapter (shares interval with engine)
 local adapterDebugLast = 0

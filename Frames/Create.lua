@@ -2487,13 +2487,6 @@ function DF:CreateAuraIcon(parent, index, auraType)
                 if not unit then return end
                 if self.auraData.auraInstanceID and GameTooltip.SetUnitAuraByAuraInstanceID then
                     GameTooltip:SetUnitAuraByAuraInstanceID(unit, self.auraData.auraInstanceID)
-                elseif self.auraData.index then
-                    if self.auraType == "BUFF" then
-                        GameTooltip:SetUnitBuff(unit, self.auraData.index, "HELPFUL")
-                    else
-                        local filter = db.debuffShowAll and "HARMFUL" or "HARMFUL|RAID"
-                        GameTooltip:SetUnitDebuff(unit, self.auraData.index, filter)
-                    end
                 end
             end
         end

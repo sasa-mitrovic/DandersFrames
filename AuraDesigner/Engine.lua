@@ -196,18 +196,26 @@ function Engine:UpdateFrame(frame)
     end
 
     -- Expose active auraInstanceIDs on the frame for buff bar deduplication.
-    -- Only include auras that have PLACED indicators (icon, square, bar) — frame-level
-    -- effects (border, healthbar color, name text, etc.) don't replace the buff icon so
-    -- those auras should still appear in the buff bar.
+    -- Include auras with ANY indicator type (placed or frame-level) so the
+    -- buff bar doesn't show duplicates of tracked auras.
     if not frame.dfAD_activeInstanceIDs then
         frame.dfAD_activeInstanceIDs = {}
     end
     wipe(frame.dfAD_activeInstanceIDs)
     if auras then
         for auraName, auraCfg in pairs(auras) do
-            if auraCfg.indicators and #auraCfg.indicators > 0 then
-                local auraData = activeAuras[auraName]
-                if auraData and auraData.auraInstanceID then
+            local auraData = activeAuras[auraName]
+            if auraData and auraData.auraInstanceID then
+                local hasIndicator = auraCfg.indicators and #auraCfg.indicators > 0
+                if not hasIndicator then
+                    for _, typeDef in ipairs(FRAME_LEVEL_TYPES) do
+                        if auraCfg[typeDef.key] then
+                            hasIndicator = true
+                            break
+                        end
+                    end
+                end
+                if hasIndicator then
                     frame.dfAD_activeInstanceIDs[auraData.auraInstanceID] = true
                 end
             end
