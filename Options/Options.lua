@@ -3680,6 +3680,7 @@ function DF:SetupGUIPages(GUI, CreateCategory, CreateSubTab, BuildPage)
         end
 
         local buffGroup = GUI:CreateSettingsGroup(self.child, 280)
+        buffGroup.hideOn = HideDirectOptions
         local buffHeader = buffGroup:AddWidget(GUI:CreateHeader(self.child, "Buff Filters"), 40)
         buffHeader.hideOn = HideDirectOptions
 
@@ -3743,6 +3744,7 @@ function DF:SetupGUIPages(GUI, CreateCategory, CreateSubTab, BuildPage)
         end
 
         local debuffGroup = GUI:CreateSettingsGroup(self.child, 280)
+        debuffGroup.hideOn = HideDirectOptions
         local debuffHeader = debuffGroup:AddWidget(GUI:CreateHeader(self.child, "Debuff Filters"), 40)
         debuffHeader.hideOn = HideDirectOptions
 
@@ -3779,6 +3781,7 @@ function DF:SetupGUIPages(GUI, CreateCategory, CreateSubTab, BuildPage)
 
         -- ===== DEFENSIVES INFO (Column 2, Direct mode only) =====
         local defGroup = GUI:CreateSettingsGroup(self.child, 280)
+        defGroup.hideOn = HideDirectOptions
         local defHeader = defGroup:AddWidget(GUI:CreateHeader(self.child, "Defensives"), 40)
         defHeader.hideOn = HideDirectOptions
 

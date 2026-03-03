@@ -539,7 +539,8 @@ local function GetOrCreateTintOverlay(frame)
     local overlay = CreateFrame("StatusBar", nil, healthBar)
     overlay:SetAllPoints(healthBar)
     overlay:SetFrameLevel(healthBar:GetFrameLevel() + 1)
-    overlay:SetStatusBarTexture("Interface\\Buttons\\WHITE8x8")
+    local tex = healthBar:GetStatusBarTexture()
+    overlay:SetStatusBarTexture(tex and tex:GetTexture() or "Interface\\Buttons\\WHITE8x8")
     overlay:SetMinMaxValues(0, 1)
     overlay:SetValue(1)
     overlay:Hide()
@@ -614,6 +615,14 @@ function Indicators:RevertHealthBar(frame)
     if state.tintOverlay then
         UnregisterExpiring(state.tintOverlay)
         state.tintOverlay:Hide()
+    end
+
+    -- Refresh health bar color so the bar shows the correct color
+    -- (class color, custom color, etc.) after the overlay is removed.
+    -- This also handles the login edge case where the bar may not
+    -- have been fully colored before the overlay was first applied.
+    if DF.UpdateHealthBarAppearance then
+        DF:UpdateHealthBarAppearance(frame)
     end
 end
 
