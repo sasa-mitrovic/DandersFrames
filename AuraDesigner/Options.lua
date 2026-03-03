@@ -666,6 +666,7 @@ local enableBanner        -- Enable toggle banner
 local coexistBanner       -- "Buffs are also visible" info strip
 local tileStrip           -- Horizontal scrolling aura tile palette
 local tileStripContent    -- ScrollChild for tile strip
+local tileStripScrollbar  -- Horizontal scrollbar for tile strip
 local framePreview        -- Mock unit frame preview
 local activeEffectsStrip  -- Active effects list below preview
 local dragHintText        -- Dynamic hint text below frame preview
@@ -1511,6 +1512,7 @@ local function PopulateTileStrip()
 
     local totalWidth = TILE_PAD + (#auras + 1) * (68 + TILE_GAP) + TILE_PAD
     tileStripContent:SetWidth(totalWidth)
+    if tileStripScrollbar then tileStripScrollbar:UpdatePosition() end
 
     -- Update tile strip header count
     if tileStripHeader and tileStripHeader.countLabel then
@@ -2897,6 +2899,128 @@ end
 
 
 -- ============================================================
+-- HORIZONTAL SCROLLBAR HELPER
+-- Creates a thin scrollbar track + draggable thumb at the bottom
+-- of a horizontal ScrollFrame. Auto-hides when content fits.
+-- ============================================================
+
+local SCROLLBAR_H = 8
+local SCROLLBAR_THUMB_MIN_W = 20
+
+local function CreateHorizontalScrollbar(scrollFrame, scrollChild)
+    local track = CreateFrame("Frame", nil, scrollFrame)
+    track:SetHeight(SCROLLBAR_H)
+    track:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMLEFT", 0, 0)
+    track:SetPoint("BOTTOMRIGHT", scrollFrame, "BOTTOMRIGHT", 0, 0)
+    track:SetFrameLevel(scrollFrame:GetFrameLevel() + 5)
+
+    local trackBg = track:CreateTexture(nil, "BACKGROUND")
+    trackBg:SetAllPoints()
+    trackBg:SetColorTexture(0.08, 0.08, 0.08, 0.6)
+
+    local thumb = CreateFrame("Frame", nil, track)
+    thumb:SetHeight(SCROLLBAR_H - 2)
+    thumb:SetPoint("TOP", track, "TOP", 0, -1)
+    thumb:EnableMouse(true)
+    thumb:SetMovable(true)
+
+    local thumbTex = thumb:CreateTexture(nil, "ARTWORK")
+    thumbTex:SetAllPoints()
+    thumbTex:SetColorTexture(0.4, 0.4, 0.4, 0.8)
+    thumb.tex = thumbTex
+
+    -- Highlight on hover
+    thumb:SetScript("OnEnter", function(self)
+        self.tex:SetColorTexture(0.55, 0.55, 0.55, 0.9)
+    end)
+    thumb:SetScript("OnLeave", function(self)
+        if not self.isDragging then
+            self.tex:SetColorTexture(0.4, 0.4, 0.4, 0.8)
+        end
+    end)
+
+    -- Drag logic
+    thumb:SetScript("OnMouseDown", function(self, button)
+        if button == "LeftButton" then
+            self.isDragging = true
+            self.tex:SetColorTexture(0.65, 0.65, 0.65, 1.0)
+            local cx = select(1, GetCursorPosition()) / UIParent:GetEffectiveScale()
+            self.dragStartX = cx
+            self.dragStartScroll = scrollFrame:GetHorizontalScroll()
+        end
+    end)
+    thumb:SetScript("OnMouseUp", function(self, button)
+        if button == "LeftButton" then
+            self.isDragging = false
+            if self:IsMouseOver() then
+                self.tex:SetColorTexture(0.55, 0.55, 0.55, 0.9)
+            else
+                self.tex:SetColorTexture(0.4, 0.4, 0.4, 0.8)
+            end
+        end
+    end)
+    thumb:SetScript("OnUpdate", function(self)
+        if not self.isDragging then return end
+        local cx = select(1, GetCursorPosition()) / UIParent:GetEffectiveScale()
+        local dx = cx - self.dragStartX
+        local trackW = track:GetWidth()
+        local thumbW = self:GetWidth()
+        local scrollRange = trackW - thumbW
+        if scrollRange <= 0 then return end
+        local contentW = scrollChild:GetWidth()
+        local visibleW = scrollFrame:GetWidth()
+        local maxScroll = max(0, contentW - visibleW)
+        local scrollPerPixel = maxScroll / scrollRange
+        local newScroll = max(0, min(maxScroll, self.dragStartScroll + dx * scrollPerPixel))
+        scrollFrame:SetHorizontalScroll(newScroll)
+        track:UpdatePosition()
+    end)
+
+    -- Click on track to jump
+    track:EnableMouse(true)
+    track:SetScript("OnMouseDown", function(self, button)
+        if button == "LeftButton" then
+            local cx = select(1, GetCursorPosition()) / UIParent:GetEffectiveScale()
+            local trackLeft = self:GetLeft()
+            local trackW = self:GetWidth()
+            local thumbW = thumb:GetWidth()
+            local clickRatio = (cx - trackLeft - thumbW / 2) / (trackW - thumbW)
+            clickRatio = max(0, min(1, clickRatio))
+            local contentW = scrollChild:GetWidth()
+            local visibleW = scrollFrame:GetWidth()
+            local maxScroll = max(0, contentW - visibleW)
+            scrollFrame:SetHorizontalScroll(clickRatio * maxScroll)
+            self:UpdatePosition()
+        end
+    end)
+
+    -- Update thumb position and size
+    function track:UpdatePosition()
+        local contentW = scrollChild:GetWidth()
+        local visibleW = scrollFrame:GetWidth()
+        if contentW <= visibleW then
+            track:Hide()
+            return
+        end
+        track:Show()
+        local trackW = track:GetWidth()
+        local ratio = visibleW / contentW
+        local thumbW = max(SCROLLBAR_THUMB_MIN_W, trackW * ratio)
+        thumb:SetWidth(thumbW)
+
+        local maxScroll = contentW - visibleW
+        local scrollPos = scrollFrame:GetHorizontalScroll()
+        local scrollRatio = (maxScroll > 0) and (scrollPos / maxScroll) or 0
+        local xOffset = scrollRatio * (trackW - thumbW)
+        thumb:ClearAllPoints()
+        thumb:SetPoint("TOPLEFT", track, "TOPLEFT", xOffset, -1)
+    end
+
+    track:Hide()  -- hidden by default until content overflows
+    return track
+end
+
+-- ============================================================
 -- STRIP HEADER HELPER
 -- Creates a small header bar (TRACKABLE AURAS, ACTIVE EFFECTS, etc.)
 -- ============================================================
@@ -3260,11 +3384,16 @@ local function CreateActiveEffectsStrip(parent, yOffset, rightPanelRef)
     stripContent:SetWidth(800)
     stripScroll:SetScrollChild(stripContent)
 
+    -- Horizontal scrollbar
+    local effectsScrollbar = CreateHorizontalScrollbar(stripScroll, stripContent)
+    wrapper.scrollbar = effectsScrollbar
+
     stripScroll:SetScript("OnMouseWheel", function(self, delta)
         local current = self:GetHorizontalScroll()
         local maxScrollVal = max(0, stripContent:GetWidth() - self:GetWidth())
         local newScroll = max(0, min(maxScrollVal, current - (delta * 68)))
         self:SetHorizontalScroll(newScroll)
+        effectsScrollbar:UpdatePosition()
     end)
 
     wrapper.stripContent = stripContent
@@ -3473,6 +3602,9 @@ local function RefreshActiveEffectsStrip()
     -- Update scroll content width
     if stripParent.SetWidth then
         stripParent:SetWidth(max(xOffset + 10, 100))
+    end
+    if activeEffectsStrip and activeEffectsStrip.scrollbar then
+        activeEffectsStrip.scrollbar:UpdatePosition()
     end
 
     -- Update header count
@@ -3935,11 +4067,16 @@ function DF.BuildAuraDesignerPage(guiRef, pageRef, dbRef)
     tileStripContent:SetWidth(800)
     tileStrip:SetScrollChild(tileStripContent)
 
+    -- Horizontal scrollbar
+    local tileScrollbar = CreateHorizontalScrollbar(tileStrip, tileStripContent)
+    tileStripScrollbar = tileScrollbar
+
     tileStrip:SetScript("OnMouseWheel", function(self, delta)
         local current = self:GetHorizontalScroll()
         local maxScroll = max(0, tileStripContent:GetWidth() - self:GetWidth())
         local newScroll = max(0, min(maxScroll, current - (delta * 68)))
         self:SetHorizontalScroll(newScroll)
+        tileScrollbar:UpdatePosition()
     end)
 
     yPos = yPos - (TILE_HEADER_H + TILE_STRIP_H + SECTION_GAP)
