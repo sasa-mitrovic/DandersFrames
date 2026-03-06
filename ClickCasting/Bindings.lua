@@ -1948,17 +1948,28 @@ function CC:BuildMacroTextForBinding(binding, forGlobalBinding)
     
     -- Handle different action types
     if actionType == self.ACTION_TYPES.SPELL then
-        -- Resolve current override spell name for casting
-        -- Bindings store the root spell ID/name (e.g. "Remove Corruption"), but the
-        -- current spec may use a different override (e.g. "Nature's Cure" for Resto).
-        -- Use GetOverrideSpell to get the correct castable name for the active spec.
+        -- Resolve current spell name for the active locale and spec.
+        -- Bindings store the spell name from the language the client was using at
+        -- creation time.  We must re-resolve via spell ID so the macro contains
+        -- the name WoW's parser expects on the current client language.
+        -- Also handles spec overrides (e.g. "Remove Corruption" → "Nature's Cure").
         local spellName = binding.spellName
-        if binding.spellId and C_Spell.GetOverrideSpell then
-            local overrideId = C_Spell.GetOverrideSpell(binding.spellId)
-            if overrideId and overrideId ~= binding.spellId then
-                local overrideInfo = C_Spell.GetSpellInfo(overrideId)
-                if overrideInfo and overrideInfo.name then
-                    spellName = overrideInfo.name
+        if binding.spellId then
+            -- Check for spec override first (e.g. Remove Corruption → Nature's Cure)
+            if C_Spell.GetOverrideSpell then
+                local overrideId = C_Spell.GetOverrideSpell(binding.spellId)
+                if overrideId and overrideId ~= binding.spellId then
+                    local overrideInfo = C_Spell.GetSpellInfo(overrideId)
+                    if overrideInfo and overrideInfo.name then
+                        spellName = overrideInfo.name
+                    end
+                end
+            end
+            -- If no override changed the name, resolve the base spell for current locale
+            if spellName == binding.spellName then
+                local localizedName = GetLocalizedSpellName(binding.spellId)
+                if localizedName then
+                    spellName = localizedName
                 end
             end
         end
@@ -2206,7 +2217,7 @@ function CC:BuildCombinedMacroForBindings(bindings, forGlobalBinding)
     
     -- Friendly conditions
     if friendlyBinding and friendlyBinding.spellName then
-        local spell = friendlyBinding.spellName
+        local spell = GetLocalizedSpellName(friendlyBinding.spellId) or friendlyBinding.spellName
         local fb = friendlyBinding.fallback or {}
         local combatCond = GetCombatCondition(friendlyBinding)
         local combatStr = combatCond == "combat" and ",combat" or (combatCond == "nocombat" and ",nocombat" or "")
@@ -2232,11 +2243,11 @@ function CC:BuildCombinedMacroForBindings(bindings, forGlobalBinding)
     
     -- Hostile conditions
     if hostileBinding and hostileBinding.spellName then
-        local spell = hostileBinding.spellName
+        local spell = GetLocalizedSpellName(hostileBinding.spellId) or hostileBinding.spellName
         local fb = hostileBinding.fallback or {}
         local combatCond = GetCombatCondition(hostileBinding)
         local combatStr = combatCond == "combat" and ",combat" or (combatCond == "nocombat" and ",nocombat" or "")
-        
+
         -- Check if this is a resurrection spell (e.g., Soulstone can be used on hostile? unlikely but consistent)
         local isResSpell = CC:IsResurrectionSpell(spell)
         local lifeCondition = isResSpell and ",dead" or ",nodead"
@@ -2258,10 +2269,11 @@ function CC:BuildCombinedMacroForBindings(bindings, forGlobalBinding)
     
     -- Any target fallback (no help/harm conditions)
     if anyBinding and anyBinding.spellName then
+        local anySpell = GetLocalizedSpellName(anyBinding.spellId) or anyBinding.spellName
         local fb = anyBinding.fallback or {}
-        
+
         -- Check if this is a resurrection spell
-        local isResSpell = CC:IsResurrectionSpell(anyBinding.spellName)
+        local isResSpell = CC:IsResurrectionSpell(anySpell)
         local lifeCondition = isResSpell and ",dead" or ",nodead"
         
         -- Check if binding applies to frames (if so, always need mouseover - unless forGlobalBinding)
@@ -2271,19 +2283,19 @@ function CC:BuildCombinedMacroForBindings(bindings, forGlobalBinding)
         -- Check what fallbacks are enabled for "any" binding
         local hasMouseover = forGlobalBinding and fb.mouseover == true or (not forGlobalBinding and (appliesToFrames or fb.mouseover == true))
         if hasMouseover then
-            table.insert(parts, "[@mouseover,exists" .. lifeCondition .. "] " .. anyBinding.spellName)
+            table.insert(parts, "[@mouseover,exists" .. lifeCondition .. "] " .. anySpell)
         end
         if fb.target then
-            table.insert(parts, "[@target,exists" .. lifeCondition .. "] " .. anyBinding.spellName)
+            table.insert(parts, "[@target,exists" .. lifeCondition .. "] " .. anySpell)
         end
         -- If no specific fallbacks and no frames (or forGlobalBinding with no fallbacks), use empty condition
         if forGlobalBinding then
             if not fb.mouseover and not fb.target then
-                table.insert(parts, "[] " .. anyBinding.spellName)
+                table.insert(parts, "[] " .. anySpell)
             end
         else
             if not appliesToFrames and not fb.mouseover and not fb.target then
-                table.insert(parts, "[] " .. anyBinding.spellName)
+                table.insert(parts, "[] " .. anySpell)
             end
         end
     end
@@ -2292,9 +2304,10 @@ function CC:BuildCombinedMacroForBindings(bindings, forGlobalBinding)
     if friendlyBinding and friendlyBinding.spellName then
         local fb = friendlyBinding.fallback or {}
         if fb.selfCast then
+            local friendlySpell = GetLocalizedSpellName(friendlyBinding.spellId) or friendlyBinding.spellName
             local combatCond = GetCombatCondition(friendlyBinding)
             local combatStr = combatCond == "combat" and ",combat" or (combatCond == "nocombat" and ",nocombat" or "")
-            table.insert(parts, "[@player" .. combatStr .. "] " .. friendlyBinding.spellName)
+            table.insert(parts, "[@player" .. combatStr .. "] " .. friendlySpell)
         end
     end
     
@@ -2698,12 +2711,12 @@ function CC:BuildHelpHarmMacroBody(friendlyBinding, hostileBinding, anyBinding)
     
     -- Friendly spell with [help] condition
     if friendlyBinding and friendlyBinding.spellName then
-        local spellName = friendlyBinding.spellName
+        local spellName = GetLocalizedSpellName(friendlyBinding.spellId) or friendlyBinding.spellName
         local fallback = friendlyBinding.fallback or {}
         local combatCond = GetCombatCondition(friendlyBinding)
-        
+
         -- Check if this is a resurrection spell
-        local isResSpell = self:IsResurrectionSpell(spellName)
+        local isResSpell = self:IsResurrectionSpell(spellName, friendlyBinding.spellId)
         local lifeCondition = isResSpell and ",dead" or ",nodead"
         
         -- Build combat condition string for reuse
@@ -2725,12 +2738,12 @@ function CC:BuildHelpHarmMacroBody(friendlyBinding, hostileBinding, anyBinding)
     
     -- Hostile spell with [harm] condition
     if hostileBinding and hostileBinding.spellName then
-        local spellName = hostileBinding.spellName
+        local spellName = GetLocalizedSpellName(hostileBinding.spellId) or hostileBinding.spellName
         local fallback = hostileBinding.fallback or {}
         local combatCond = GetCombatCondition(hostileBinding)
-        
+
         -- Check if this is a resurrection spell
-        local isResSpell = self:IsResurrectionSpell(spellName)
+        local isResSpell = self:IsResurrectionSpell(spellName, hostileBinding.spellId)
         local lifeCondition = isResSpell and ",dead" or ",nodead"
         
         -- Build combat condition string for reuse
@@ -2752,13 +2765,15 @@ function CC:BuildHelpHarmMacroBody(friendlyBinding, hostileBinding, anyBinding)
     
     -- Any target fallback
     if anyBinding and anyBinding.spellName then
-        table.insert(parts, "[] " .. anyBinding.spellName)
+        local anySpell = GetLocalizedSpellName(anyBinding.spellId) or anyBinding.spellName
+        table.insert(parts, "[] " .. anySpell)
     end
-    
+
     -- Self-cast fallback for friendly spell (at the very end)
     if friendlyBinding and friendlyBinding.spellName then
         local fallback = friendlyBinding.fallback or {}
         if fallback.selfCast then
+            local friendlySpell = GetLocalizedSpellName(friendlyBinding.spellId) or friendlyBinding.spellName
             local combatCond = GetCombatCondition(friendlyBinding)
             local combatStr = ""
             if combatCond == "combat" then
@@ -2766,7 +2781,7 @@ function CC:BuildHelpHarmMacroBody(friendlyBinding, hostileBinding, anyBinding)
             elseif combatCond == "nocombat" then
                 combatStr = ",nocombat"
             end
-            table.insert(parts, "[@player" .. combatStr .. "] " .. friendlyBinding.spellName)
+            table.insert(parts, "[@player" .. combatStr .. "] " .. friendlySpell)
         end
     end
 

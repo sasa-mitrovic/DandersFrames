@@ -21,6 +21,7 @@ DF.CHANGELOG_TEXT = [===[
 * (Frames) Fixed aura icons created during combat permanently losing tooltip hover after combat ends
 * (Click Casting) Fixed smart resurrection not working on non-English WoW clients
 * (Click Casting) Fixed click-casting "Spell not Learned" errors after talent changes
+* (Click Casting) Fixed all click-casting bindings failing on non-English WoW clients
 
 ## [4.0.11] - 2026-03-03
 
