@@ -233,32 +233,19 @@ CC.RESURRECTION_SPELLS = {
     },
 }
 
--- Spells that are already resurrection spells (don't add smart res to these)
-CC.RESURRECTION_SPELL_NAMES = {
-    -- Normal res
-    ["Revive"] = true,
-    ["Redemption"] = true,
-    ["Resurrection"] = true,
-    ["Ancestral Spirit"] = true,
-    ["Resuscitate"] = true,
-    ["Return"] = true,
-    -- Mass res (class-specific names)
-    ["Revitalize"] = true,      -- Druid
-    ["Absolution"] = true,       -- Paladin
-    ["Mass Resurrection"] = true, -- Priest
-    ["Ancestral Vision"] = true,  -- Shaman
-    ["Reawaken"] = true,         -- Monk
-    ["Mass Return"] = true,      -- Evoker
-    -- Combat res
-    ["Rebirth"] = true,
-    ["Raise Ally"] = true,
-    ["Soulstone"] = true,
-    ["Intercession"] = true,
-    -- Engineering
-    ["Goblin Jumper Cables"] = true,
-    ["Goblin Jumper Cables XL"] = true,
-    ["Gnomish Army Knife"] = true,
-}
+-- Spell IDs for all resurrection spells (used for locale-safe detection)
+CC.RESURRECTION_SPELL_IDS = {}
+for _, classData in pairs(CC.RESURRECTION_SPELLS) do
+    for _, spellData in pairs(classData) do
+        if type(spellData) == "table" and spellData.id then
+            CC.RESURRECTION_SPELL_IDS[spellData.id] = true
+        end
+    end
+end
+-- Engineering items (spell IDs)
+CC.RESURRECTION_SPELL_IDS[8342] = true   -- Goblin Jumper Cables
+CC.RESURRECTION_SPELL_IDS[22999] = true  -- Goblin Jumper Cables XL
+CC.RESURRECTION_SPELL_IDS[54732] = true  -- Gnomish Army Knife
 
 -- Smart Resurrection mode options
 CC.SMART_RES_MODES = {

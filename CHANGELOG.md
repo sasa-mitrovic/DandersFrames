@@ -20,6 +20,8 @@
 * Fixed Aura Designer "Add aura" dropdown in layout groups not closing on ESC or clicking outside
 * Fixed border indicator showing no visible difference between thickness 1 and 2 at most UI scales
 * Fixed Aura Designer Hide Cooldown Swipe per-indicator setting not falling back to global default
+* Fixed smart resurrection not working on non-English WoW clients
+* Fixed click-casting "Spell not Learned" errors after talent changes
 
 ## [4.0.12] - 2026-03-04
 

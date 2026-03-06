@@ -1713,49 +1713,68 @@ end
 -- Inspired by the Clicked addon's approach.
 -- ============================================================
 
--- Get the player's available resurrection spells
+-- Resolve the localized spell name from a spell ID
+local function GetLocalizedSpellName(spellId)
+    if not spellId then return nil end
+    if C_Spell and C_Spell.GetSpellInfo then
+        local info = C_Spell.GetSpellInfo(spellId)
+        return info and info.name
+    end
+    return nil
+end
+
+-- Get the player's available resurrection spells (returns localized names)
 function CC:GetPlayerResurrectionSpells()
     local _, playerClass = UnitClass("player")
     local classSpells = self.RESURRECTION_SPELLS[playerClass]
     if not classSpells then return nil end
-    
+
     local available = {}
-    
+
     -- Helper to check if spell is known (works with spell ID)
     local function IsSpellAvailable(spellData)
         if not spellData then return false end
         local spellId = spellData.id
         if not spellId then return false end
-        
+
         -- Use IsSpellInSpellBook with includeOverrides for proper override detection
         if C_SpellBook and C_SpellBook.IsSpellInSpellBook then
             return C_SpellBook.IsSpellInSpellBook(spellId, Enum.SpellBookSpellBank.Player, true)
         end
         return false
     end
-    
-    -- Check normal res
+
+    -- Check normal res — resolve localized name from spell ID
     if classSpells.normal and IsSpellAvailable(classSpells.normal) then
-        available.normal = classSpells.normal.name
+        available.normal = GetLocalizedSpellName(classSpells.normal.id) or classSpells.normal.name
     end
-    
+
     -- Check mass res (healer specs only usually)
     if classSpells.mass and IsSpellAvailable(classSpells.mass) then
-        available.mass = classSpells.mass.name
+        available.mass = GetLocalizedSpellName(classSpells.mass.id) or classSpells.mass.name
     end
-    
+
     -- Check combat res
     if classSpells.combat and IsSpellAvailable(classSpells.combat) then
-        available.combat = classSpells.combat.name
+        available.combat = GetLocalizedSpellName(classSpells.combat.id) or classSpells.combat.name
     end
-    
+
     return available
 end
 
--- Check if a spell is already a resurrection spell
-function CC:IsResurrectionSpell(spellName)
-    if not spellName then return false end
-    return self.RESURRECTION_SPELL_NAMES[spellName] == true
+-- Check if a spell is already a resurrection spell (locale-safe, uses spell ID)
+function CC:IsResurrectionSpell(spellName, spellId)
+    if spellId and self.RESURRECTION_SPELL_IDS[spellId] then
+        return true
+    end
+    -- Fallback: resolve spell name to ID and check
+    if spellName and C_Spell and C_Spell.GetSpellInfo then
+        local info = C_Spell.GetSpellInfo(spellName)
+        if info and info.spellID and self.RESURRECTION_SPELL_IDS[info.spellID] then
+            return true
+        end
+    end
+    return false
 end
 
 -- Debug command to test resurrection spell detection
@@ -1948,7 +1967,7 @@ function CC:BuildMacroTextForBinding(binding, forGlobalBinding)
         local parts = {}
         
         -- Check if this is a resurrection spell - res spells need "dead" instead of "nodead"
-        local isResSpell = self:IsResurrectionSpell(spellName)
+        local isResSpell = self:IsResurrectionSpell(spellName, binding.spellId)
         local lifeCondition = isResSpell and ",dead" or ",nodead"
         
         -- SMART RESURRECTION FIRST (dead targets take priority)
