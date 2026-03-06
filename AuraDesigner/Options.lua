@@ -81,40 +81,109 @@ local OUTLINE_OPTIONS = {
 -- ============================================================
 
 local function MigrateToSpecScoped(adDB)
-    if not adDB or adDB._specScopedV1 then return end
-    if not adDB.auras then adDB._specScopedV1 = true; return end
-    local isFlat = false
-    for _, val in pairs(adDB.auras) do
-        if type(val) == "table" and (val.priority ~= nil or val.indicators ~= nil) then
-            isFlat = true
-            break
-        end
-    end
-    if isFlat then
-        local oldAuras = adDB.auras
-        local newAuras = {}
-        local auraToSpecs = {}
-        local trackable = DF.AuraDesigner and DF.AuraDesigner.TrackableAuras
-        if trackable then
-            for specKey, auraList in pairs(trackable) do
-                for _, info in ipairs(auraList) do
-                    if not auraToSpecs[info.name] then auraToSpecs[info.name] = {} end
-                    tinsert(auraToSpecs[info.name], specKey)
+    if not adDB then return end
+
+    -- V1: migrate flat adDB.auras → spec-keyed adDB.auras
+    if not adDB._specScopedV1 then
+        if adDB.auras then
+            local isFlat = false
+            for _, val in pairs(adDB.auras) do
+                if type(val) == "table" and (val.priority ~= nil or val.indicators ~= nil) then
+                    isFlat = true
+                    break
                 end
             end
-        end
-        for auraName, auraCfg in pairs(oldAuras) do
-            local specs = auraToSpecs[auraName]
-            if specs then
-                for _, specKey in ipairs(specs) do
-                    if not newAuras[specKey] then newAuras[specKey] = {} end
-                    newAuras[specKey][auraName] = DF:DeepCopy(auraCfg)
+            if isFlat then
+                local oldAuras = adDB.auras
+                local newAuras = {}
+                local auraToSpecs = {}
+                local trackable = DF.AuraDesigner and DF.AuraDesigner.TrackableAuras
+                if trackable then
+                    for specKey, auraList in pairs(trackable) do
+                        for _, info in ipairs(auraList) do
+                            if not auraToSpecs[info.name] then auraToSpecs[info.name] = {} end
+                            tinsert(auraToSpecs[info.name], specKey)
+                        end
+                    end
                 end
+                for auraName, auraCfg in pairs(oldAuras) do
+                    local specs = auraToSpecs[auraName]
+                    if specs then
+                        for _, specKey in ipairs(specs) do
+                            if not newAuras[specKey] then newAuras[specKey] = {} end
+                            newAuras[specKey][auraName] = DF:DeepCopy(auraCfg)
+                        end
+                    end
+                end
+                adDB.auras = newAuras
             end
         end
-        adDB.auras = newAuras
+        adDB._specScopedV1 = true
     end
-    adDB._specScopedV1 = true
+
+    -- V2: migrate flat adDB.layoutGroups array → spec-keyed
+    if not adDB._specScopedV2 then
+        if adDB.layoutGroups then
+            -- Detect flat array: first entry has numeric key and .id field
+            local isFlat = false
+            for k, v in pairs(adDB.layoutGroups) do
+                if type(k) == "number" and type(v) == "table" and v.id ~= nil then
+                    isFlat = true
+                    break
+                end
+            end
+            if isFlat then
+                local oldGroups = adDB.layoutGroups
+                local newGroups = {}
+                -- For each group, find which specs its member auras belong to
+                local auraToSpecs = {}
+                if adDB.auras then
+                    for specKey, specAuras in pairs(adDB.auras) do
+                        if type(specAuras) == "table" then
+                            for auraName in pairs(specAuras) do
+                                if not auraToSpecs[auraName] then auraToSpecs[auraName] = {} end
+                                auraToSpecs[auraName][specKey] = true
+                            end
+                        end
+                    end
+                end
+                for _, group in ipairs(oldGroups) do
+                    -- Determine which specs this group's members belong to
+                    local targetSpecs = {}
+                    if group.members then
+                        for _, member in ipairs(group.members) do
+                            local specs = auraToSpecs[member.auraName]
+                            if specs then
+                                for specKey in pairs(specs) do
+                                    targetSpecs[specKey] = true
+                                end
+                            end
+                        end
+                    end
+                    -- Copy group to each relevant spec, filtering members
+                    for specKey in pairs(targetSpecs) do
+                        if not newGroups[specKey] then newGroups[specKey] = {} end
+                        local groupCopy = DF:DeepCopy(group)
+                        -- Filter members to only those that exist in this spec
+                        if groupCopy.members then
+                            local filtered = {}
+                            for _, member in ipairs(groupCopy.members) do
+                                local specs = auraToSpecs[member.auraName]
+                                if specs and specs[specKey] then
+                                    tinsert(filtered, member)
+                                end
+                            end
+                            groupCopy.members = filtered
+                        end
+                        tinsert(newGroups[specKey], groupCopy)
+                    end
+                end
+                adDB.layoutGroups = newGroups
+            end
+        end
+        -- Migrate nextLayoutGroupID to per-spec too (just keep global as fallback)
+        adDB._specScopedV2 = true
+    end
 end
 
 -- Expose for Engine.lua and post-import use
@@ -122,7 +191,7 @@ DF.MigrateAuraDesignerSpecScope = MigrateToSpecScoped
 
 local function GetAuraDesignerDB()
     local adDB = db.auraDesigner
-    if adDB and not adDB._specScopedV1 then
+    if adDB and (not adDB._specScopedV1 or not adDB._specScopedV2) then
         MigrateToSpecScoped(adDB)
     end
     return adDB
@@ -254,6 +323,17 @@ local function GetSpecAuras(spec)
     if not spec then return {} end
     if not adDB.auras[spec] then adDB.auras[spec] = {} end
     return adDB.auras[spec]
+end
+
+-- Returns the spec-scoped layout groups array, creating it if needed
+local function GetSpecLayoutGroups(spec)
+    local adDB = GetAuraDesignerDB()
+    if not adDB then return {} end
+    if not adDB.layoutGroups then adDB.layoutGroups = {} end
+    spec = spec or ResolveSpec()
+    if not spec then return {} end
+    if not adDB.layoutGroups[spec] then adDB.layoutGroups[spec] = {} end
+    return adDB.layoutGroups[spec]
 end
 
 -- Ensure an aura config table exists, creating it with defaults if needed
@@ -795,9 +875,8 @@ local expandedGroups = {}
 
 -- Find which layout group (if any) an indicator belongs to
 local function GetIndicatorLayoutGroup(auraName, indicatorID)
-    local adDB = GetAuraDesignerDB()
-    if not adDB or not adDB.layoutGroups then return nil end
-    for _, group in ipairs(adDB.layoutGroups) do
+    local groups = GetSpecLayoutGroups()
+    for _, group in ipairs(groups) do
         if group.members then
             for _, member in ipairs(group.members) do
                 if member.auraName == auraName and member.indicatorID == indicatorID then
@@ -811,16 +890,13 @@ end
 
 -- Get all placed indicators NOT in any layout group
 local function GetUngroupedIndicators()
-    local adDB = GetAuraDesignerDB()
-    if not adDB then return {} end
     -- Build set of grouped indicators
     local grouped = {}
-    if adDB.layoutGroups then
-        for _, group in ipairs(adDB.layoutGroups) do
-            if group.members then
-                for _, member in ipairs(group.members) do
-                    grouped[member.auraName .. "#" .. member.indicatorID] = true
-                end
+    local groups = GetSpecLayoutGroups()
+    for _, group in ipairs(groups) do
+        if group.members then
+            for _, member in ipairs(group.members) do
+                grouped[member.auraName .. "#" .. member.indicatorID] = true
             end
         end
     end
@@ -856,7 +932,7 @@ end
 local function CreateLayoutGroup(name)
     local adDB = GetAuraDesignerDB()
     if not adDB then return nil end
-    if not adDB.layoutGroups then adDB.layoutGroups = {} end
+    local groups = GetSpecLayoutGroups()
     if not adDB.nextLayoutGroupID then adDB.nextLayoutGroupID = 1 end
     local id = adDB.nextLayoutGroupID
     adDB.nextLayoutGroupID = id + 1
@@ -870,15 +946,14 @@ local function CreateLayoutGroup(name)
         spacing = 2,
         members = {},
     }
-    tinsert(adDB.layoutGroups, group)
+    tinsert(groups, group)
     return group
 end
 
 -- Delete a layout group by ID
 local function DeleteLayoutGroup(groupID)
-    local adDB = GetAuraDesignerDB()
-    if not adDB or not adDB.layoutGroups then return end
-    for i, group in ipairs(adDB.layoutGroups) do
+    local groups = GetSpecLayoutGroups()
+    for i, group in ipairs(groups) do
         if group.id == groupID then
             -- Delete all member indicators when deleting the group
             if group.members then
@@ -886,7 +961,7 @@ local function DeleteLayoutGroup(groupID)
                     RemoveIndicatorInstance(member.auraName, member.indicatorID)
                 end
             end
-            tremove(adDB.layoutGroups, i)
+            tremove(groups, i)
             break
         end
     end
@@ -895,9 +970,8 @@ end
 
 -- Find a layout group by ID
 local function GetLayoutGroupByID(groupID)
-    local adDB = GetAuraDesignerDB()
-    if not adDB or not adDB.layoutGroups then return nil end
-    for _, group in ipairs(adDB.layoutGroups) do
+    local groups = GetSpecLayoutGroups()
+    for _, group in ipairs(groups) do
         if group.id == groupID then return group end
     end
     return nil
@@ -1422,15 +1496,15 @@ local function RefreshPlacedIndicators()
     -- Build layout group position lookup for preview
     -- In preview all indicators are visible, so compute positions for all members
     local groupPositions = {}  -- "auraName#indicatorID" → { anchor, offsetX, offsetY }
-    if adDB.layoutGroups then
-        for _, group in ipairs(adDB.layoutGroups) do
-            if group.members then
-                for memberIdx, member in ipairs(group.members) do
-                    local key = member.auraName .. "#" .. member.indicatorID
-                    -- Compute position based on group settings
-                    local activeIdx = memberIdx - 1  -- 0-based
-                    -- Need to find the indicator's size to compute step
-                    local memberCfg = GetSpecAuras()[member.auraName]
+    local specGroups = GetSpecLayoutGroups()
+    for _, group in ipairs(specGroups) do
+        if group.members then
+            for memberIdx, member in ipairs(group.members) do
+                local key = member.auraName .. "#" .. member.indicatorID
+                -- Compute position based on group settings
+                local activeIdx = memberIdx - 1  -- 0-based
+                -- Need to find the indicator's size to compute step
+                local memberCfg = GetSpecAuras()[member.auraName]
                     local indCfg = nil
                     if memberCfg and memberCfg.indicators then
                         for _, ind in ipairs(memberCfg.indicators) do
@@ -1463,7 +1537,6 @@ local function RefreshPlacedIndicators()
                 end
             end
         end
-    end
 
     -- Iterate all configured auras, find placed indicator instances
     for auraName, auraCfg in pairs(GetSpecAuras(spec)) do
@@ -1708,30 +1781,29 @@ RefreshPreviewLightweight = function()
 
     -- Build layout group position lookup (same as RefreshPlacedIndicators)
     local groupPositions = {}
-    if adDB.layoutGroups then
-        for _, group in ipairs(adDB.layoutGroups) do
-            if group.members then
-                for memberIdx, member in ipairs(group.members) do
-                    local key = member.auraName .. "#" .. member.indicatorID
-                    local activeIdx = memberIdx - 1
-                    local memberCfg = GetSpecAuras()[member.auraName]
-                    local indCfg = nil
-                    if memberCfg and memberCfg.indicators then
-                        for _, ind in ipairs(memberCfg.indicators) do
-                            if ind.id == member.indicatorID then indCfg = ind; break end
-                        end
+    local specGroups2 = GetSpecLayoutGroups()
+    for _, group in ipairs(specGroups2) do
+        if group.members then
+            for memberIdx, member in ipairs(group.members) do
+                local key = member.auraName .. "#" .. member.indicatorID
+                local activeIdx = memberIdx - 1
+                local memberCfg = GetSpecAuras()[member.auraName]
+                local indCfg = nil
+                if memberCfg and memberCfg.indicators then
+                    for _, ind in ipairs(memberCfg.indicators) do
+                        if ind.id == member.indicatorID then indCfg = ind; break end
                     end
-                    local size = (indCfg and indCfg.size) or (adDB.defaults and adDB.defaults.iconSize) or 24
-                    local scale = (indCfg and indCfg.scale) or (adDB.defaults and adDB.defaults.iconScale) or 1.0
-                    local step = (size * scale) + (group.spacing or 2)
-                    local oX, oY = group.offsetX or 0, group.offsetY or 0
-                    local dir = group.growDirection or "RIGHT"
-                    if dir == "RIGHT" then oX = oX + (activeIdx * step)
-                    elseif dir == "LEFT" then oX = oX - (activeIdx * step)
-                    elseif dir == "DOWN" then oY = oY - (activeIdx * step)
-                    elseif dir == "UP" then oY = oY + (activeIdx * step) end
-                    groupPositions[key] = { anchor = group.anchor or "TOPLEFT", offsetX = oX, offsetY = oY }
                 end
+                local size = (indCfg and indCfg.size) or (adDB.defaults and adDB.defaults.iconSize) or 24
+                local scale = (indCfg and indCfg.scale) or (adDB.defaults and adDB.defaults.iconScale) or 1.0
+                local step = (size * scale) + (group.spacing or 2)
+                local oX, oY = group.offsetX or 0, group.offsetY or 0
+                local dir = group.growDirection or "RIGHT"
+                if dir == "RIGHT" then oX = oX + (activeIdx * step)
+                elseif dir == "LEFT" then oX = oX - (activeIdx * step)
+                elseif dir == "DOWN" then oY = oY - (activeIdx * step)
+                elseif dir == "UP" then oY = oY + (activeIdx * step) end
+                groupPositions[key] = { anchor = group.anchor or "TOPLEFT", offsetX = oX, offsetY = oY }
             end
         end
     end
@@ -3988,9 +4060,8 @@ BuildLayoutGroupsTab = function()
     end)
     yPos = yPos - 42
 
-    -- Get groups
-    local adDB = GetAuraDesignerDB()
-    local groups = adDB and adDB.layoutGroups or {}
+    -- Get groups for current spec
+    local groups = GetSpecLayoutGroups()
 
     -- Display name lookup
     local spec = ResolveSpec()

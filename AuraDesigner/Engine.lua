@@ -69,14 +69,15 @@ end
 -- which grouped indicators are currently active.
 -- ============================================================
 
-local function ResolveLayoutGroups(adDB, activeInds)
+local function ResolveLayoutGroups(adDB, activeInds, spec)
     wipe(groupLookup)
     wipe(groupActiveMembers)
 
-    if not adDB.layoutGroups then return end
+    local specGroups = adDB.layoutGroups and adDB.layoutGroups[spec]
+    if not specGroups then return end
 
     -- Build lookup from all group members
-    for _, group in ipairs(adDB.layoutGroups) do
+    for _, group in ipairs(specGroups) do
         if group.members then
             groupActiveMembers[group.id] = {}
             for memberIdx, member in ipairs(group.members) do
@@ -148,7 +149,7 @@ function Engine:UpdateFrame(frame)
     end
 
     -- Lazy migration: ensure spec-scoped format
-    if not adDB._specScopedV1 and DF.MigrateAuraDesignerSpecScope then
+    if (not adDB._specScopedV1 or not adDB._specScopedV2) and DF.MigrateAuraDesignerSpecScope then
         DF.MigrateAuraDesignerSpecScope(adDB)
     end
 
@@ -348,7 +349,7 @@ function Engine:UpdateFrame(frame)
     end
 
     -- Resolve layout group membership and compute active members
-    ResolveLayoutGroups(adDB, activeIndicators)
+    ResolveLayoutGroups(adDB, activeIndicators, spec)
 
     -- Dispatch to indicator renderers
     Indicators:BeginFrame(frame)
