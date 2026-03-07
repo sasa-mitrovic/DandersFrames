@@ -294,18 +294,33 @@ end
 function DebugConsole:GetExportText()
     if not debugLog then return "No debug log available." end
 
-    local lines = {}
-    tinsert(lines, "DandersFrames Debug Log")
-    tinsert(lines, "Version: " .. (DF.VERSION or "unknown"))
-    tinsert(lines, "Exported: " .. date("%Y-%m-%d %H:%M:%S"))
-    tinsert(lines, "Entries: " .. #debugLog)
-    tinsert(lines, "========================================")
-    tinsert(lines, "")
+    -- Respect current severity and category filters so the export
+    -- matches what the user sees in the debug console
+    local minLevel = SEVERITY[(debugDb and debugDb.logLevel) or "INFO"]
+    if not minLevel then minLevel = SEVERITY.INFO end
+    local minLevelNum = minLevel.level
+    local filters = (debugDb and debugDb.filters) or {}
 
+    local entries = {}
     for _, entry in ipairs(debugLog) do
-        tinsert(lines, format("%s [%s] [%s] %s",
-            entry[1], entry[2], entry[3], entry[4]))
+        local sev = SEVERITY[entry[2]]
+        if sev and sev.level >= minLevelNum and filters[entry[3]] ~= false then
+            tinsert(entries, format("%s [%s] [%s] %s",
+                entry[1], entry[2], entry[3], entry[4]))
+        end
     end
 
-    return table.concat(lines, "\n")
+    local result = {}
+    tinsert(result, "DandersFrames Debug Log")
+    tinsert(result, "Version: " .. (DF.VERSION or "unknown"))
+    tinsert(result, "Exported: " .. date("%Y-%m-%d %H:%M:%S"))
+    tinsert(result, "Entries: " .. #entries .. " (filtered from " .. #debugLog .. " total)")
+    tinsert(result, "Min Level: " .. (debugDb and debugDb.logLevel or "INFO"))
+    tinsert(result, "========================================")
+    tinsert(result, "")
+    for i = 1, #entries do
+        result[#result + 1] = entries[i]
+    end
+
+    return table.concat(result, "\n")
 end

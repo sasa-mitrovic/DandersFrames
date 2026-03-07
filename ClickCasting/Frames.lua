@@ -439,19 +439,18 @@ function CC:CreateClickCastHeader()
         end)
     end
     
-    -- === MOUSEOVERSTATE DRIVER ===
-    -- This clears bindings when there's no mouseover unit (mouse left all frames)
-    -- Works in combat because it's a secure state driver
-    -- When [@mouseover, exists] becomes false AND we're not over a button, clear bindings
-    self.header:SetAttribute("_onstate-mouseoverstate", [[
-        if newstate == "false" and mouseoverbutton then
-            if not mouseoverbutton:IsUnderMouse() then
-                mouseoverbutton:ClearBindings()
-                mouseoverbutton = nil
-            end
-        end
-    ]])
-    RegisterStateDriver(self.header, "mouseoverstate", "[@mouseover, exists] true; false")
+    -- === MOUSEOVERSTATE DRIVER — REMOVED ===
+    -- Previously had a state driver on [@mouseover, exists] that cleared bindings
+    -- when no mouseover unit existed. This was the ROOT CAUSE of the click-casting bug:
+    -- [@mouseover, exists] would briefly flicker to false while the mouse was still
+    -- physically over a frame (e.g., unit token changing, brief API desync).
+    -- The state driver would then call ClearBindings() and set mouseoverbutton=nil,
+    -- breaking keyboard bindings mid-hover.
+    --
+    -- The WrapScript OnLeave already handles cleanup when the mouse actually leaves,
+    -- and the OnHide hook handles frames that get hidden. The state driver was a
+    -- redundant safety net that caused more harm than good.
+    -- Removed 2026-03-07 after diagnostic tracing confirmed clearedBy=statedriver.
     
     -- Track registered frames
     self.registeredFrames = {}
@@ -1266,6 +1265,75 @@ function CC:RegisterFrame(frame)
     self:UpdateFrameBindingAttributes(frame)
 end
 
+-- ============================================================
+-- BINDING STATE DIAGNOSTIC TICKER
+-- Read-only observer that polls dfBindingsActive every 200ms while hovering.
+-- Logs the exact moment bindings transition from active to cleared,
+-- helping pinpoint the Blizzard WrapScript bug.
+-- No protected function calls — purely reads attributes and logs.
+-- ============================================================
+
+local DIAG_INTERVAL = 0.2  -- seconds between polls
+
+function CC:StartDiagnosticTicker(frame)
+    self:StopDiagnosticTicker()
+
+    local frameName = frame:GetName() or "unnamed"
+    self.diagTickerFrame = frame
+    self.diagLastBindState = frame:GetAttribute("dfBindingsActive") and true or false
+    self.diagTickCount = 0
+
+    self.diagTicker = C_Timer.NewTicker(DIAG_INTERVAL, function()
+        -- Stop if frame is no longer hovered
+        if CC.currentHoveredFrame ~= frame then
+            CC:StopDiagnosticTicker()
+            return
+        end
+
+        CC.diagTickCount = (CC.diagTickCount or 0) + 1
+        local bindingsActive = frame:GetAttribute("dfBindingsActive") and true or false
+        local wrapEnterCount = frame:GetAttribute("dfWrapEnterCount") or 0
+        local wrapLeaveCount = frame:GetAttribute("dfWrapLeaveCount") or 0
+
+        -- Check if the restricted environment still considers this frame the mouseoverbutton
+        -- dfIsSecureMouseover is set to true on WrapScript OnEnter, cleared when another frame enters
+        local isSecureMouseover = frame:GetAttribute("dfIsSecureMouseover") and true or false
+
+        -- Detect transition: bindings were active, now they're not
+        if CC.diagLastBindState and not bindingsActive then
+            DF:DebugError("CLICK", "BINDINGS VANISHED on %s at tick %d! wrapEnter=%d wrapLeave=%d isSecureMO=%s visible=%s mouseOver=%s combat=%s",
+                frameName, CC.diagTickCount, wrapEnterCount, wrapLeaveCount, tostring(isSecureMouseover),
+                tostring(frame:IsVisible()), tostring(frame:IsMouseOver()), tostring(InCombatLockdown()))
+        end
+
+        -- Detect mouseoverbutton desync: we think we're hovering this frame,
+        -- but the restricted environment no longer considers it the mouseoverbutton
+        -- (some other frame's WrapScript OnEnter fired and took ownership)
+        if not isSecureMouseover then
+            if not CC.diagDesyncReported then
+                CC.diagDesyncReported = true
+                DF:DebugError("CLICK", "MOUSEOVERBUTTON DESYNC on %s at tick %d! dfIsSecureMouseover=nil wrapEnter=%d wrapLeave=%d kbActive=%s",
+                    frameName, CC.diagTickCount, wrapEnterCount, wrapLeaveCount, tostring(bindingsActive))
+            end
+        else
+            CC.diagDesyncReported = nil
+        end
+
+        CC.diagLastBindState = bindingsActive
+    end)
+end
+
+function CC:StopDiagnosticTicker()
+    if self.diagTicker then
+        self.diagTicker:Cancel()
+        self.diagTicker = nil
+    end
+    self.diagTickerFrame = nil
+    self.diagTickCount = nil
+    self.diagLastBindState = nil
+    self.diagDesyncReported = nil
+end
+
 -- Set up keyboard binding handlers for a frame using override bindings
 -- This uses SetOverrideBindingClick to temporarily bind keyboard keys when hovering
 function CC:SetupSecureHandlers(frame)
@@ -1287,47 +1355,118 @@ function CC:SetupSecureHandlers(frame)
         -- WrapScript OnEnter: Set up bindings
         -- Also clears previous frame's bindings to avoid stacking
         local onEnterSnippet = [[
-            -- Debug: increment WrapScript enter counter
+            -- Phase 0: Reset tracking for this enter cycle
+            -- dfBindingsActive is cleared FIRST so a stale true from the previous
+            -- enter can't fool us. It only gets set back to true at the very end.
+            self:SetAttribute("dfBindingsActive", nil)
+            self:SetAttribute("dfClearedBy", nil)
+            self:SetAttribute("dfStateDriverCount", nil)
+            self:SetAttribute("dfStateDriverUnderMouse", nil)
+            self:SetAttribute("dfEnterPhase", 0)
+
+            -- Phase 1: increment WrapScript enter counter
             local wrapCount = (self:GetAttribute("dfWrapEnterCount") or 0) + 1
             self:SetAttribute("dfWrapEnterCount", wrapCount)
+            self:SetAttribute("dfEnterPhase", 1)
 
-            -- Clear bindings from previous button if any
+            -- Phase 2: store what mouseoverbutton was before we change it
+            if mouseoverbutton then
+                self:SetAttribute("dfSecurePrevMouseover", mouseoverbutton:GetAttribute("dfFrameName") or "unknown")
+            else
+                self:SetAttribute("dfSecurePrevMouseover", "nil")
+            end
+            self:SetAttribute("dfEnterPhase", 2)
+
+            -- Phase 3: Clear bindings from previous button if any
             if mouseoverbutton and mouseoverbutton ~= self then
                 mouseoverbutton:ClearBindings()
                 mouseoverbutton:SetAttribute("dfBindingsActive", nil)
+                mouseoverbutton:SetAttribute("dfIsSecureMouseover", nil)
             end
+            self:SetAttribute("dfEnterPhase", 3)
+
+            -- Phase 4: Set mouseoverbutton
             mouseoverbutton = self
+            self:SetAttribute("dfIsSecureMouseover", true)
+            self:SetAttribute("dfEnterPhase", 4)
 
-            -- Clear our own bindings first then re-apply
+            -- Phase 5: Clear our own bindings first then re-apply
             self:ClearBindings()
+            self:SetAttribute("dfEnterPhase", 5)
 
-            -- Get and run the binding snippet stored on this frame
+            -- Phase 6: Run the binding snippet
             local snippet = self:GetAttribute("dfBindingSnippet")
             if snippet and snippet ~= "" then
                 self:Run(snippet)
                 self:SetAttribute("dfBindingsActive", true)
+                self:SetAttribute("dfEnterPhase", 6)
             else
                 self:SetAttribute("dfBindingsActive", false)
+                self:SetAttribute("dfEnterPhase", -1)
             end
+
+            -- Phase 7: Post-completion verification
+            -- Check that mouseoverbutton still points to self after everything ran
+            if mouseoverbutton == self then
+                self:SetAttribute("dfPostCheck", "ok")
+            elseif mouseoverbutton then
+                -- mouseoverbutton changed to a DIFFERENT frame during OnEnter
+                self:SetAttribute("dfPostCheck", mouseoverbutton:GetAttribute("dfFrameName") or "other")
+            else
+                -- mouseoverbutton is nil — something wiped it during OnEnter
+                self:SetAttribute("dfPostCheck", "nil")
+            end
+            self:SetAttribute("dfEnterPhase", 7)
         ]]
-        
+
         -- WrapScript OnLeave: Clear bindings when leaving frame
         -- With SetPropagateMouseMotion(true) on child elements (auras),
         -- OnLeave only fires when truly leaving to the 3D world
         local onLeaveSnippet = [[
+            -- Debug: increment WrapScript leave counter
+            local leaveCount = (self:GetAttribute("dfWrapLeaveCount") or 0) + 1
+            self:SetAttribute("dfWrapLeaveCount", leaveCount)
+
+            -- Debug: store who mouseoverbutton actually points to when leave fires
+            if mouseoverbutton then
+                self:SetAttribute("dfMouseoverOnLeave", mouseoverbutton:GetAttribute("dfFrameName") or "unknown")
+            else
+                self:SetAttribute("dfMouseoverOnLeave", "nil")
+            end
+            -- Store whether the mouseoverbutton==self check will pass
+            self:SetAttribute("dfLeaveCheckPassed", mouseoverbutton == self)
+
             if mouseoverbutton == self then
+                self:SetAttribute("dfClearedBy", "onleave")
                 self:ClearBindings()
                 self:SetAttribute("dfBindingsActive", nil)
+                self:SetAttribute("dfIsSecureMouseover", nil)
                 mouseoverbutton = nil
             end
         ]]
         
+        -- WrapScript OnHide: Clear bindings when frame is hidden during combat
+        -- This runs in the restricted (secure) environment, so it can call
+        -- ClearBindings() even during combat — unlike HookScript OnHide.
+        -- Covers the case where a frame is hidden while hovered (e.g., party
+        -- member leaves group, pet dies) and OnLeave doesn't fire.
+        local onHideSnippet = [[
+            if mouseoverbutton == self then
+                self:SetAttribute("dfClearedBy", "onhide")
+                self:ClearBindings()
+                self:SetAttribute("dfBindingsActive", nil)
+                self:SetAttribute("dfIsSecureMouseover", nil)
+                mouseoverbutton = nil
+            end
+        ]]
+
         local wrapSuccess = pcall(function()
             -- Standard WrapScript - our bindings run in pre script (before other handlers)
             -- Note: Previously tried post parameter for Clicked compatibility, but it broke
             -- click casting entirely. Reverted 2025-01-20.
             self.header:WrapScript(frame, "OnEnter", onEnterSnippet)
             self.header:WrapScript(frame, "OnLeave", onLeaveSnippet)
+            self.header:WrapScript(frame, "OnHide", onHideSnippet)
         end)
         
         if not wrapSuccess then
@@ -1337,21 +1476,22 @@ function CC:SetupSecureHandlers(frame)
         end
     end
     
-    -- Clear bindings when frame is hidden
+    -- Diagnostic logging for OnHide (insecure side)
+    -- Actual binding cleanup is handled by WrapScript OnHide above (secure, works in combat)
     frame:HookScript("OnHide", function(self)
-        if not InCombatLockdown() then
-            local wasHovered = (CC.currentHoveredFrame == self)
-            if wasHovered then
-                DF:DebugWarn("CLICK", "OnHide %s while HOVERED — clearing bindings! caller: %s",
-                    self:GetName() or "unnamed", debugstack(2, 1, 0) or "unknown")
-            end
-            ClearOverrideBindings(self)
+        local wasHovered = (CC.currentHoveredFrame == self)
+        if wasHovered then
+            local clearedBy = self:GetAttribute("dfClearedBy") or "?"
+            DF:DebugWarn("CLICK", "OnHide %s while HOVERED — clearedBy=%s combat=%s",
+                self:GetName() or "unnamed", clearedBy, tostring(InCombatLockdown()))
+            CC.currentHoveredFrame = nil
         end
     end)
     
-    -- Set frame type as attributes
+    -- Set frame type and identity attributes
     frame:SetAttribute("dfIsDandersFrame", frame.dfIsDandersFrame == true)
     frame:SetAttribute("dfIsBlizzardFrame", frame.dfIsBlizzardFrame == true)
+    frame:SetAttribute("dfFrameName", frame:GetName() or "unnamed")  -- readable from WrapScript
     
     -- Track current hovered frame for click-casting + diagnostic logging
     frame:HookScript("OnEnter", function(self)
@@ -1364,22 +1504,44 @@ function CC:SetupSecureHandlers(frame)
         local frameName = self:GetName() or "unnamed"
         local unit = self:GetAttribute("unit") or self.unit or "?"
         local type1 = self:GetAttribute("type1")
-        local wrapCount = self:GetAttribute("dfWrapEnterCount") or 0
+        local wrapEnterCount = self:GetAttribute("dfWrapEnterCount") or 0
+        local wrapLeaveCount = self:GetAttribute("dfWrapLeaveCount") or 0
 
         -- Store the wrap count we expect; if it didn't increment, WrapScript didn't fire
-        local prevWrapCount = self.dfLastWrapEnterCount or 0
-        self.dfLastWrapEnterCount = wrapCount
+        local prevWrapEnterCount = self.dfLastWrapEnterCount or 0
+        local prevWrapLeaveCount = self.dfLastWrapLeaveCount or 0
+        self.dfLastWrapEnterCount = wrapEnterCount
+        self.dfLastWrapLeaveCount = wrapLeaveCount
 
-        DF:Debug("CLICK", "OnEnter %s unit=%s kbActive=%s hasKB=%s type1=%s wrapFired=%s",
+        local wrapEnterFired = wrapEnterCount > prevWrapEnterCount
+
+        local enterPhase = self:GetAttribute("dfEnterPhase") or -99
+        local prevMouseover = self:GetAttribute("dfSecurePrevMouseover") or "?"
+        local postCheck = self:GetAttribute("dfPostCheck") or "?"
+
+        DF:Debug("CLICK", "OnEnter %s unit=%s kbActive=%s hasKB=%s type1=%s wrapEnter=%s(%d) wrapLeave=%d phase=%d prev=%s postCheck=%s",
             frameName, tostring(unit), tostring(bindingsActive),
             tostring(hasKeyboardBindings), tostring(type1),
-            tostring(wrapCount > prevWrapCount))
+            tostring(wrapEnterFired), wrapEnterCount, wrapLeaveCount,
+            enterPhase, prevMouseover, postCheck)
+
+        -- Key diagnostic: mouseoverbutton was not self after OnEnter completed
+        if wrapEnterFired and postCheck ~= "ok" then
+            DF:DebugError("CLICK", "POST-CHECK FAILED on %s! mouseoverbutton=%s after phase 7 — self reference lost during OnEnter",
+                frameName, postCheck)
+        end
+
+        -- Key diagnostic: WrapScript didn't complete all phases
+        if wrapEnterFired and enterPhase < 7 and hasKeyboardBindings then
+            DF:DebugError("CLICK", "WRAPSCRIPT INCOMPLETE on %s! phase=%d (expected 7) prev=%s",
+                frameName, enterPhase, prevMouseover)
+        end
 
         -- Key diagnostic: hover is on but WrapScript didn't activate keyboard bindings
         if hasKeyboardBindings and not bindingsActive then
-            DF:DebugWarn("CLICK", "HOVER BUT NO KB BINDINGS on %s! Key presses will go to action bar", frameName)
-            if wrapCount == prevWrapCount then
-                DF:DebugWarn("CLICK", "  WrapScript OnEnter DID NOT FIRE (count=%d)", wrapCount)
+            DF:DebugWarn("CLICK", "HOVER BUT NO KB BINDINGS on %s! Key presses will go to action bar (phase=%d)", frameName, enterPhase)
+            if not wrapEnterFired then
+                DF:DebugWarn("CLICK", "  WrapScript OnEnter DID NOT FIRE (enterCount=%d leaveCount=%d)", wrapEnterCount, wrapLeaveCount)
                 DF:DebugWarn("CLICK", "  frame visible=%s shown=%s mouseOver=%s combat=%s",
                     tostring(self:IsVisible()), tostring(self:IsShown()),
                     tostring(self:IsMouseOver()), tostring(InCombatLockdown()))
@@ -1389,9 +1551,8 @@ function CC:SetupSecureHandlers(frame)
                     parent and parent:GetName() or "nil",
                     CC.header and CC.header:GetName() or "nil")
             else
-                DF:DebugWarn("CLICK", "  WrapScript fired (count=%d) but dfBindingsActive=%s snippet=%d chars",
-                    wrapCount, tostring(bindingsActive), #snippet)
-                -- Snippet exists but didn't set bindings active — log first 200 chars
+                DF:DebugWarn("CLICK", "  WrapScript fired (enterCount=%d phase=%d) but dfBindingsActive=%s snippet=%d chars",
+                    wrapEnterCount, enterPhase, tostring(bindingsActive), #snippet)
                 DF:DebugWarn("CLICK", "  snippet preview: %s", snippet:sub(1, 200))
             end
             DF:DebugWarn("CLICK", "  handlersSetup=%s registered=%s",
@@ -1402,15 +1563,55 @@ function CC:SetupSecureHandlers(frame)
         if not type1 or type1 == "" then
             DF:DebugWarn("CLICK", "NO TYPE1 on %s - left-click won't cast!", frameName)
         end
+
+        -- Start diagnostic ticker to monitor binding state while hovering
+        if hasKeyboardBindings then
+            CC:StartDiagnosticTicker(self)
+        end
     end)
 
     frame:HookScript("OnLeave", function(self)
         local wasTracked = (CC.currentHoveredFrame == self)
         CC.currentHoveredFrame = nil
-        DF:Debug("CLICK", "OnLeave %s", self:GetName() or "unnamed")
+
+        -- Stop the diagnostic ticker
+        CC:StopDiagnosticTicker()
+
+        local frameName = self:GetName() or "unnamed"
+        local wrapLeaveCount = self:GetAttribute("dfWrapLeaveCount") or 0
+        local prevWrapLeaveCount = self.dfLastWrapLeaveCount or 0
+        local wrapLeaveFired = wrapLeaveCount > prevWrapLeaveCount
+        self.dfLastWrapLeaveCount = wrapLeaveCount
+
+        local bindingsActive = self:GetAttribute("dfBindingsActive")
+
+        DF:Debug("CLICK", "OnLeave %s wrapLeave=%s(%d) kbStillActive=%s",
+            frameName, tostring(wrapLeaveFired), wrapLeaveCount, tostring(bindingsActive))
+
         if not wasTracked then
-            DF:DebugWarn("CLICK", "OnLeave %s but wasn't tracked as hovered — possible orphan leave",
-                self:GetName() or "unnamed")
+            DF:DebugWarn("CLICK", "OnLeave %s but wasn't tracked as hovered — possible orphan leave", frameName)
+        end
+
+        -- Warn if WrapScript OnLeave didn't fire (bindings may not have been cleared)
+        if not wrapLeaveFired and wasTracked then
+            DF:DebugWarn("CLICK", "WrapScript OnLeave DID NOT FIRE for %s! leaveCount=%d kbActive=%s",
+                frameName, wrapLeaveCount, tostring(bindingsActive))
+        end
+
+        -- Warn if bindings are still active after leave (WrapScript should have cleared them)
+        if bindingsActive then
+            -- Read the frame attributes set by WrapScript OnLeave to see what happened
+            local mouseoverOnLeave = self:GetAttribute("dfMouseoverOnLeave") or "?"
+            local leaveCheckPassed = self:GetAttribute("dfLeaveCheckPassed")
+            local isSecureMouseover = self:GetAttribute("dfIsSecureMouseover")
+            local postCheck = self:GetAttribute("dfPostCheck") or "?"
+            local clearedBy = self:GetAttribute("dfClearedBy") or "nobody"
+            local stateDriverCount = self:GetAttribute("dfStateDriverCount") or 0
+            local stateDriverUnderMouse = self:GetAttribute("dfStateDriverUnderMouse")
+            DF:DebugError("CLICK", "BINDINGS STILL ACTIVE after OnLeave %s! wrapLeave=%s mouseoverbutton=%s checkPassed=%s isSecureMO=%s postCheck=%s",
+                frameName, tostring(wrapLeaveFired), mouseoverOnLeave, tostring(leaveCheckPassed), tostring(isSecureMouseover), postCheck)
+            DF:DebugError("CLICK", "  clearedBy=%s stateDriverFired=%d stateDriverUnderMouse=%s",
+                clearedBy, stateDriverCount, tostring(stateDriverUnderMouse))
         end
     end)
 
@@ -1443,11 +1644,17 @@ function CC:SetupSecureHandlers(frame)
 
         -- Warn if click-cast type is missing for this button
         if not typeAttr or typeAttr == "" then
-            DF:DebugWarn("CLICK", "MISSING TYPE for btn=%s on %s - click won't cast!", button, frameName)
             local bindingsActive = self:GetAttribute("dfBindingsActive")
             local snippet = self:GetAttribute("dfBindingSnippet") or ""
-            DF:DebugWarn("CLICK", "  kbActive=%s snippet=%d chars combat=%s",
-                tostring(bindingsActive), #snippet, tostring(InCombatLockdown()))
+            local wrapEnterCount = self:GetAttribute("dfWrapEnterCount") or 0
+            local wrapLeaveCount = self:GetAttribute("dfWrapLeaveCount") or 0
+            local isHovered = (CC.currentHoveredFrame == self)
+
+            DF:DebugWarn("CLICK", "MISSING TYPE for btn=%s on %s - click won't cast!", button, frameName)
+            DF:DebugWarn("CLICK", "  kbActive=%s snippet=%d chars combat=%s isHovered=%s",
+                tostring(bindingsActive), #snippet, tostring(InCombatLockdown()), tostring(isHovered))
+            DF:DebugWarn("CLICK", "  wrapEnter=%d wrapLeave=%d visible=%s mouseOver=%s",
+                wrapEnterCount, wrapLeaveCount, tostring(self:IsVisible()), tostring(self:IsMouseOver()))
         end
     end)
 

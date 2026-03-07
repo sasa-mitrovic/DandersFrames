@@ -7001,8 +7001,8 @@ function DF:SetupGUIPages(GUI, CreateCategory, CreateSubTab, BuildPage)
             end
         end), 32)
 
-        -- Copy All to Clipboard button
-        actionsGroup:AddWidget(GUI:CreateButton(self.child, "Copy All to Clipboard", 260, 26, function()
+        -- Copy Filtered to Clipboard button
+        actionsGroup:AddWidget(GUI:CreateButton(self.child, "Copy to Clipboard", 260, 26, function()
             if not DF.DebugConsole then return end
             local text = DF.DebugConsole:GetExportText()
 
@@ -7029,7 +7029,7 @@ function DF:SetupGUIPages(GUI, CreateCategory, CreateSubTab, BuildPage)
             -- Title
             local title = popup:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
             title:SetPoint("TOP", 0, -10)
-            title:SetText("Debug Log Export")
+            title:SetText("Debug Log Export (Filtered)")
             title:SetTextColor(0.9, 0.9, 0.9)
 
             -- Instructions
