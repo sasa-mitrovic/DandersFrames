@@ -439,18 +439,36 @@ function CC:CreateClickCastHeader()
         end)
     end
     
-    -- === MOUSEOVERSTATE DRIVER — REMOVED ===
-    -- Previously had a state driver on [@mouseover, exists] that cleared bindings
-    -- when no mouseover unit existed. This was the ROOT CAUSE of the click-casting bug:
-    -- [@mouseover, exists] would briefly flicker to false while the mouse was still
-    -- physically over a frame (e.g., unit token changing, brief API desync).
-    -- The state driver would then call ClearBindings() and set mouseoverbutton=nil,
-    -- breaking keyboard bindings mid-hover.
+    -- === MOUSEOVERSTATE DRIVER ===
+    -- Clears bindings when there's no mouseover unit (e.g., a Blizzard panel
+    -- opens over the frame, stealing focus without firing WrapScript OnLeave).
     --
-    -- The WrapScript OnLeave already handles cleanup when the mouse actually leaves,
-    -- and the OnHide hook handles frames that get hidden. The state driver was a
-    -- redundant safety net that caused more harm than good.
-    -- Removed 2026-03-07 after diagnostic tracing confirmed clearedBy=statedriver.
+    -- Guard uses GetMousePosition() instead of IsUnderMouse() because:
+    -- IsUnderMouse() returns 1 (not true) when hovering, and nil otherwise.
+    -- During brief [@mouseover, exists] flickers in combat, it returns nil
+    -- even when the mouse IS over the frame, causing false clears.
+    -- GetMousePosition() returns actual x,y coordinates relative to the frame
+    -- (0,0 = bottom-left, 1,1 = top-right) which may be more reliable.
+    self.header:SetAttribute("_onstate-mouseoverstate", [[
+        if newstate == "false" and mouseoverbutton then
+            local x, y = mouseoverbutton:GetMousePosition()
+
+            -- Store diagnostics
+            mouseoverbutton:SetAttribute("dfStateDriverCount", (mouseoverbutton:GetAttribute("dfStateDriverCount") or 0) + 1)
+            mouseoverbutton:SetAttribute("dfSDMouseX", x)
+            mouseoverbutton:SetAttribute("dfSDMouseY", y)
+
+            -- If mouse is outside frame bounds (or position unavailable), clear bindings
+            if not x or x < 0 or x > 1 or y < 0 or y > 1 then
+                mouseoverbutton:SetAttribute("dfClearedBy", "statedriver")
+                mouseoverbutton:ClearBindings()
+                mouseoverbutton:SetAttribute("dfBindingsActive", nil)
+                mouseoverbutton:SetAttribute("dfIsSecureMouseover", nil)
+                mouseoverbutton = nil
+            end
+        end
+    ]])
+    RegisterStateDriver(self.header, "mouseoverstate", "[@mouseover, exists] true; false")
     
     -- Track registered frames
     self.registeredFrames = {}
@@ -1361,7 +1379,8 @@ function CC:SetupSecureHandlers(frame)
             self:SetAttribute("dfBindingsActive", nil)
             self:SetAttribute("dfClearedBy", nil)
             self:SetAttribute("dfStateDriverCount", nil)
-            self:SetAttribute("dfStateDriverUnderMouse", nil)
+            self:SetAttribute("dfSDMouseX", nil)
+            self:SetAttribute("dfSDMouseY", nil)
             self:SetAttribute("dfEnterPhase", 0)
 
             -- Phase 1: increment WrapScript enter counter
@@ -1607,11 +1626,12 @@ function CC:SetupSecureHandlers(frame)
             local postCheck = self:GetAttribute("dfPostCheck") or "?"
             local clearedBy = self:GetAttribute("dfClearedBy") or "nobody"
             local stateDriverCount = self:GetAttribute("dfStateDriverCount") or 0
-            local stateDriverUnderMouse = self:GetAttribute("dfStateDriverUnderMouse")
+            local sdMouseX = self:GetAttribute("dfSDMouseX")
+            local sdMouseY = self:GetAttribute("dfSDMouseY")
             DF:DebugError("CLICK", "BINDINGS STILL ACTIVE after OnLeave %s! wrapLeave=%s mouseoverbutton=%s checkPassed=%s isSecureMO=%s postCheck=%s",
                 frameName, tostring(wrapLeaveFired), mouseoverOnLeave, tostring(leaveCheckPassed), tostring(isSecureMouseover), postCheck)
-            DF:DebugError("CLICK", "  clearedBy=%s stateDriverFired=%d stateDriverUnderMouse=%s",
-                clearedBy, stateDriverCount, tostring(stateDriverUnderMouse))
+            DF:DebugError("CLICK", "  clearedBy=%s stateDriverFired=%d mousePos=%s,%s",
+                clearedBy, stateDriverCount, tostring(sdMouseX), tostring(sdMouseY))
         end
     end)
 
