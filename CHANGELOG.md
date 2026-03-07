@@ -3,7 +3,7 @@
 ## [4.0.13] - 2026-03-07
 
 ### Bug Fixes
-* (Click Casting) **Fixed keyboard click-cast bindings randomly stopping mid-hover** — root cause identified as the `[@mouseover, exists]` state driver briefly flickering to false during combat (unit token changes, API desync), which cleared all keyboard bindings while the mouse was still over the frame. Removed the state driver entirely and replaced with a secure WrapScript OnHide handler that properly cleans up bindings when frames are hidden during combat
+* (Click Casting) **Fixed keyboard click-cast bindings randomly stopping mid-hover** — an internal safety mechanism was incorrectly clearing bindings during combat, causing keyboard-bound spells to stop working until the mouse left and re-entered the frame
 * (Click Casting) Fixed spell transform procs (e.g. Flash of Light → Benediction) causing "Spell not Learned" errors — macros now always use the base spell name since WoW's /cast command handles override resolution automatically
 * (Click Casting) Fixed left-click casting randomly failing on some party/raid frames — Blizzard click-cast clearing was racing with the binding batch processor, leaving frames unclickable if combat started mid-batch
 * (Aura Blacklist) Fixed class dropdown overlapping text and not changing the displayed lists when selecting a different class
