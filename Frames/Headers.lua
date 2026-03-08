@@ -3889,14 +3889,18 @@ function DF:ApplyRaidGroupSorting()
     for i = 1, 8 do
         local header = DF.raidSeparatedHeaders[i]
         if header then
-            -- All groups use showRaid=true, showPlayer=true
+            -- Check visibility setting for this group (used after sorting attributes are set)
+            local showGroup = db.raidGroupVisible and db.raidGroupVisible[i]
+            if showGroup == nil then showGroup = true end
+
+            -- All groups get sorting attributes set (so they're ready if made visible later)
             header:SetAttribute("showPlayer", true)
             header:SetAttribute("showRaid", true)
             header:SetAttribute("showParty", false)
-            
+
             -- NOTE: Positioning attributes (point, yOffset, sortDir, ClearAllPoints/SetPoint)
             -- are now handled by the secure position handler via UpdateRaidPositionAttributes
-            
+
             -- CHECK sortEnabled FIRST (like party sorting does)
             -- This ensures ALL headers get sorting disabled, not just those that don't need nameList
             if not sortEnabled then
@@ -3909,12 +3913,7 @@ function DF:ApplyRaidGroupSorting()
                 header:SetAttribute("strictFiltering", nil)
                 header:SetAttribute("groupFilter", tostring(i))  -- Keep groupFilter to show correct group
                 header:SetAttribute("sortMethod", "INDEX")
-                
-                -- Force header to re-evaluate by hiding and showing
-                -- This is required for SecureGroupHeaderTemplate to rebuild frames
-                header:Hide()
-                header:Show()
-                
+
                 if DF.debugHeaders then
                     print("|cFF00FF00[DF Headers]|r   Group", i, ": sorting DISABLED, using INDEX")
                 end
@@ -3925,14 +3924,14 @@ function DF:ApplyRaidGroupSorting()
                 -- 2. OR player's group with FIRST/LAST position
                 local isPlayerGroup = (i == playerGroup)
                 local useNameList = needsAdvancedSorting or (isPlayerGroup and playerNeedsNameList)
-                
+
                 if useNameList then
                     -- Use nameList for custom sorting
                     -- For player's group: use selfPosition
                     -- For other groups: use "SORTED" (player position doesn't matter)
                     local groupSelfPosition = isPlayerGroup and selfPosition or "SORTED"
                     local nameList = DF:BuildRaidGroupNameList(i, groupSelfPosition)
-                    
+
                     -- Clear native sorting attributes - use direct SetAttribute to bypass cache
                     -- This ensures attributes are always set fresh when switching modes
                     header:SetAttribute("groupBy", nil)
@@ -3940,16 +3939,11 @@ function DF:ApplyRaidGroupSorting()
                     header:SetAttribute("groupFilter", nil)  -- nameList acts as the filter
                     header:SetAttribute("roleFilter", nil)
                     header:SetAttribute("strictFiltering", nil)
-                    
+
                     -- Set nameList and sortMethod directly (bypass cache)
                     header:SetAttribute("nameList", nameList)
                     header:SetAttribute("sortMethod", "NAMELIST")
-                    
-                    -- Force header to re-evaluate by hiding and showing
-                    -- This is required for SecureGroupHeaderTemplate to re-sort children
-                    header:Hide()
-                    header:Show()
-                    
+
                     if DF.debugHeaders then
                         local tag = isPlayerGroup and "(player)" or ""
                         print("|cFF00FF00[DF Headers]|r   Group", i, tag, ": nameList mode -", nameList)
@@ -3962,19 +3956,28 @@ function DF:ApplyRaidGroupSorting()
                     header:SetAttribute("groupingOrder", roleOrderString)
                     header:SetAttribute("groupBy", "ASSIGNEDROLE")
                     header:SetAttribute("sortMethod", "NAME")
-                    
-                    -- FIX: Force header to re-evaluate by hiding and showing.
-                    -- Without this, SecureGroupHeaderTemplate may not reassign units
-                    -- when attributes haven't changed, leaving unitFrameMap empty
-                    -- after a wipe (e.g., zone transition). Every other sorting branch
-                    -- already does this Hide/Show cycle.
-                    header:Hide()
-                    header:Show()
-                    
+
                     if DF.debugHeaders then
                         print("|cFF00FF00[DF Headers]|r   Group", i, ": native role sorting, groupFilter=", i)
                     end
                 end
+            end
+
+            -- Force SecureGroupHeaderTemplate to re-evaluate sorting attributes
+            -- by hiding and re-showing. Only re-show if the group should be visible
+            -- per user settings — this prevents hidden groups from reappearing on
+            -- roster changes (the root cause of the positioning/visibility desync).
+            header:Hide()
+            if showGroup then
+                header:Show()
+                DF:SetHeaderChildrenEventsEnabled(header, true)
+            else
+                -- Group is hidden per user settings — keep it hidden
+                -- Set count to 0 so positioning handler skips this group (no gap)
+                if DF.raidPositionHandler then
+                    DF.raidPositionHandler:SetAttribute("group" .. i .. "count", 0)
+                end
+                DF:SetHeaderChildrenEventsEnabled(header, false)
             end
         end
     end
@@ -7390,7 +7393,7 @@ headerEventFrame:SetScript("OnEvent", function(self, event, arg1, arg2)
 
         -- Reset self-healing cooldown so the first missed UNIT_HEALTH event
         -- after zone transition triggers an immediate map rebuild
-        headerChildEventFrame.lastMapRebuild = nil
+        DF.lastMapRebuild = nil
 
         -- Clear phased icon cache - stale phase data from previous zone/group
         if DF.WipePhasedCache then DF:WipePhasedCache() end
@@ -7881,8 +7884,8 @@ headerChildEventFrame:SetScript("OnEvent", function(self, event, arg1)
             -- burning CPU on events for units we genuinely don't track.
             if not frame and (unit:match("^raid%d") or unit:match("^party%d") or unit == "player") then
                 local now = GetTime()
-                if not self.lastMapRebuild or (now - self.lastMapRebuild) > 1.0 then
-                    self.lastMapRebuild = now
+                if not DF.lastMapRebuild or (now - DF.lastMapRebuild) > 1.0 then
+                    DF.lastMapRebuild = now
                     DF:RebuildUnitFrameMap()
                     frame = unitFrameMap[unit]
                 end
@@ -7976,8 +7979,8 @@ headerChildEventFrame:SetScript("OnEvent", function(self, event, arg1)
             -- online" or vice versa.
             if not frame and (unit:match("^raid%d") or unit:match("^party%d") or unit == "player") then
                 local now = GetTime()
-                if not self.lastMapRebuild or (now - self.lastMapRebuild) > 1.0 then
-                    self.lastMapRebuild = now
+                if not DF.lastMapRebuild or (now - DF.lastMapRebuild) > 1.0 then
+                    DF.lastMapRebuild = now
                     DF:RebuildUnitFrameMap()
                     frame = unitFrameMap[unit]
                 end

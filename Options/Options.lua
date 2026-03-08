@@ -1042,6 +1042,8 @@ function DF:SetupGUIPages(GUI, CreateCategory, CreateSubTab, BuildPage)
                     DF.SecureSort:PushRaidGroupLayoutConfig()
                     DF.SecureSort:TriggerSecureRaidSort()
                 end
+                -- Update test mode frames if active
+                if DF.raidTestMode then DF:UpdateRaidTestFrames() end
             else
                 DF:UpdateAllFrames()
             end
@@ -1199,6 +1201,8 @@ function DF:SetupGUIPages(GUI, CreateCategory, CreateSubTab, BuildPage)
             local overrideKey = "raidGroupVisible_" .. i
             groupVisGroup:AddWidget(GUI:CreateCheckbox(self.child, "Group " .. i, nil, nil, 
                 function()
+                    -- Update test mode frames if active
+                    if DF.raidTestMode then DF:UpdateRaidTestFrames() end
                     if db.raidUseGroups then
                         -- Separated mode
                         DF:UpdateRaidHeaderVisibility(); DF:PositionRaidHeaders()
@@ -1240,6 +1244,8 @@ function DF:SetupGUIPages(GUI, CreateCategory, CreateSubTab, BuildPage)
         local groupOrderWidget = GUI:CreateGroupOrderList(self.child, db, "raidGroupDisplayOrder", function()
             if DF.UpdateRaidGroupOrderAttributes then DF:UpdateRaidGroupOrderAttributes() end
             DF:TriggerRaidPosition()
+            -- Update test mode frames if active
+            if DF.raidTestMode then DF:UpdateRaidTestFrames() end
         end)
         groupOrderGroup:AddWidget(groupOrderWidget, 230)
         

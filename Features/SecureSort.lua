@@ -3098,10 +3098,16 @@ function SecureSort:CalculateRaidSlotPosition(slotIndex, frameCount, layoutParam
     local vSpacing = layoutParams.vSpacing or 2
     local playersPerRow = layoutParams.playersPerRow or 5
     local horizontal = layoutParams.horizontal
-    
+
     -- growthAnchor: where the grid is positioned in container (mapped from START/CENTER/END)
     local growthAnchor = layoutParams.growthAnchor or "TOPLEFT"
-    
+
+    -- frameAnchor/columnAnchor: control fill direction within the grid
+    -- frameAnchor = "END" reverses the primary fill axis (e.g. right-to-left instead of left-to-right)
+    -- columnAnchor = "END" reverses the secondary axis (e.g. bottom-to-top instead of top-to-bottom)
+    local frameAnchor = layoutParams.frameAnchor or "START"
+    local columnAnchor = layoutParams.columnAnchor or "START"
+
     -- Calculate row and column for this slot
     local row, col
     if horizontal then
@@ -3113,8 +3119,10 @@ function SecureSort:CalculateRaidSlotPosition(slotIndex, frameCount, layoutParam
         col = math.floor(slotIndex / playersPerRow)
         row = slotIndex % playersPerRow
     end
-    
-    -- Calculate grid dimensions (needed for TOP/CENTER anchors)
+
+    -- Reverse fill direction based on frameAnchor and columnAnchor
+    -- In horizontal mode: frameAnchor reverses columns, columnAnchor reverses rows
+    -- In vertical mode: frameAnchor reverses rows, columnAnchor reverses columns
     local numCols, numRows
     if horizontal then
         numCols = math.min(playersPerRow, frameCount)
@@ -3123,11 +3131,28 @@ function SecureSort:CalculateRaidSlotPosition(slotIndex, frameCount, layoutParam
         numRows = math.min(playersPerRow, frameCount)
         numCols = math.ceil(frameCount / playersPerRow)
     end
+
+    if horizontal then
+        if frameAnchor == "END" then
+            col = (numCols - 1) - col
+        end
+        if columnAnchor == "END" then
+            row = (numRows - 1) - row
+        end
+    else
+        if frameAnchor == "END" then
+            row = (numRows - 1) - row
+        end
+        if columnAnchor == "END" then
+            col = (numCols - 1) - col
+        end
+    end
+
     local gridWidth = numCols * frameWidth + (numCols - 1) * hSpacing
-    
+
     -- Calculate position based on growthAnchor
     local x, y
-    
+
     if growthAnchor == "TOP" then
         -- TOP: Center horizontally, anchor at top
         -- Frames grow down from top, centered horizontally
@@ -3163,7 +3188,7 @@ function SecureSort:CalculateRaidSlotPosition(slotIndex, frameCount, layoutParam
         x = col * (frameWidth + hSpacing)
         y = -row * (frameHeight + vSpacing)
     end
-    
+
     return x, y
 end
 

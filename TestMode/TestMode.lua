@@ -4161,12 +4161,20 @@ function DF:UpdateRaidTestFrames()
     local db = DF:GetRaidDB()
     local testFrameCount = db.raidTestFrameCount or 10
     
-    -- Show/hide test frames
+    -- Show/hide test frames (respecting group visibility settings)
     for i = 1, 40 do
         local frame = DF.testRaidFrames[i]
         if frame then
             if i <= testFrameCount then
-                frame:Show()
+                -- Check if this frame's group is visible
+                local groupNum = math.ceil(i / 5)
+                local showGroup = db.raidGroupVisible and db.raidGroupVisible[groupNum]
+                if showGroup == nil then showGroup = true end
+                if showGroup then
+                    frame:Show()
+                else
+                    frame:Hide()
+                end
             else
                 frame:Hide()
             end
@@ -4219,14 +4227,22 @@ function DF:LightweightUpdateTestFrameCount()
         local db = DF:GetRaidDB()
         local testFrameCount = db.raidTestFrameCount or 10
         
-        -- First pass: show/hide test frames
+        -- First pass: show/hide test frames (respecting group visibility settings)
         for i = 1, 40 do
             local frame = DF.testRaidFrames[i]
             if frame then
                 if i <= testFrameCount then
-                    frame:Show()
-                    -- Update test data without layout
-                    DF:UpdateTestFrame(frame, i, false)
+                    -- Check if this frame's group is visible
+                    local groupNum = math.ceil(i / 5)
+                    local showGroup = db.raidGroupVisible and db.raidGroupVisible[groupNum]
+                    if showGroup == nil then showGroup = true end
+                    if showGroup then
+                        frame:Show()
+                        -- Update test data without layout
+                        DF:UpdateTestFrame(frame, i, false)
+                    else
+                        frame:Hide()
+                    end
                 else
                     frame:Hide()
                 end
@@ -4320,8 +4336,16 @@ function DF:LightweightPositionRaidTestFrames(testFrameCount)
         end
     end
     
-    -- Sort activeGroupList for consistent ordering
-    table.sort(activeGroupList)
+    -- Sort activeGroupList using custom display order from settings
+    local displayOrder = db.raidGroupDisplayOrder or {1, 2, 3, 4, 5, 6, 7, 8}
+    -- Build reverse lookup: group number -> display position
+    local displayPos = {}
+    for pos, groupNum in ipairs(displayOrder) do
+        displayPos[groupNum] = pos
+    end
+    table.sort(activeGroupList, function(a, b)
+        return (displayPos[a] or a) < (displayPos[b] or b)
+    end)
     
     -- Calculate and set container size
     local totalWidth, totalHeight = SecureSort:CalculateRaidGroupContainerSize(#activeGroupList, lp)
