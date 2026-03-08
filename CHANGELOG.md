@@ -3,24 +3,24 @@
 ## [4.0.13] - 2026-03-08
 
 ### Bug Fixes
-* (Click Casting) **Fixed keyboard click-cast bindings randomly stopping mid-hover** — an internal safety mechanism was incorrectly clearing bindings during combat, causing keyboard-bound spells to stop working until the mouse left and re-entered the frame
-* (Click Casting) Fixed spell transform procs (e.g. Flash of Light → Benediction) causing "Spell not Learned" errors — macros now always use the base spell name since WoW's /cast command handles override resolution automatically
-* (Click Casting) Fixed left-click casting randomly failing on some party/raid frames — Blizzard click-cast clearing was racing with the binding batch processor, leaving frames unclickable if combat started mid-batch
-* (Aura Blacklist) Fixed class dropdown overlapping text and not changing the displayed lists when selecting a different class
-* (Auto Layouts) Fixed Aura Designer changes not saving when editing an auto layout a second time — existing overrides are now properly updated instead of silently skipped
+* (Click Casting) **Fixed keyboard click-cast bindings randomly stopping mid-hover** — keyboard-bound spells would sometimes stop working until the mouse left and re-entered the frame
+* (Click Casting) Fixed spell transform procs (e.g. Flash of Light → Benediction) causing "Spell not Learned" errors
+* (Click Casting) Fixed left-click casting randomly failing on some party/raid frames
+* (Aura Blacklist) Fixed class dropdown overlapping text and not updating when selecting a different class
+* (Auto Layouts) Fixed Aura Designer changes not saving when editing an auto layout a second time
 * (Aura Designer) Fixed override indicators incorrectly appearing on internal proxy settings
-* (Aura Designer) Fixed crash when corrupted data (stray nextIndicatorID) existed at the spec auras table level — now automatically cleaned up on load
+* (Aura Designer) Fixed crash caused by corrupted saved data
 * (Aura Designer) Fixed crash when swapping to a profile without Aura Designer settings
 
 ### Improvements
-* (Missing Buff Icon) **Overhauled detection to work reliably in combat** — now uses direct O(1) spell ID lookups via Blizzard-whitelisted non-secret APIs, with a pre-combat aura snapshot as fallback; missing buff icons no longer disappear when entering combat
-* (Missing Buff Icon) Added missing talent variant spell IDs for Mark of the Wild and Arcane Intellect
-* (Missing Buff Icon) Expanded Blessing of the Bronze detection from 2 IDs to all 13 known buff variants
-* (Debug Console) Export now respects current severity and category filters, so the exported log matches what's visible in the console
-* (Aura Designer) Increased all X/Y offset slider ranges to -150 to 150 for more positioning flexibility
-* (Aura Designer) Grouped layout spacing slider now allows negative values (down to -5) for overlapping indicators
-* (Aura Designer) Added "Reset to Global" button in the editing banner when editing auto layout overrides
-* (Aura Designer) Editing banner now properly offsets page content instead of overlapping controls
+* (Missing Buff Icon) **Missing buff icons now work in combat** — previously they would disappear when entering combat
+* (Missing Buff Icon) Added support for talent variant spell IDs (Mark of the Wild, Arcane Intellect)
+* (Missing Buff Icon) Improved Blessing of the Bronze detection to cover all Evoker variants
+* (Debug Console) Export now respects current severity and category filters
+* (Aura Designer) Increased all X/Y offset slider ranges to -150 to 150
+* (Aura Designer) Grouped layout spacing slider now allows negative values for overlapping indicators
+* (Aura Designer) Added "Reset to Global" button when editing auto layout overrides
+* (Aura Designer) Editing banner no longer overlaps page controls
 
 ## [4.0.12] - 2026-03-06
 
