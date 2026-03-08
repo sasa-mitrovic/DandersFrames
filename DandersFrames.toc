@@ -5,6 +5,7 @@
 ## Author: Danders
 ## Version: v4.0.13
 ## X-Curse-Project-ID: 1389690
+## X-Wago-ID: RNL9B46o
 ## IconTexture: Interface\AddOns\DandersFrames\Media\DF_Icon
 ## SavedVariables: DandersFramesDB_v2, DandersFramesClickCastingDB
 ## SavedVariablesPerCharacter: DandersFramesCharDB
