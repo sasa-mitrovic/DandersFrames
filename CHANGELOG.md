@@ -23,7 +23,7 @@
 * (Test Mode) Fixed layout settings not refreshing test frames when changed
 
 ### New Features
-* (Range) **Overhauled range check system** — improved accuracy for Death Knights, Evokers, and classes without healing spells; phased units now correctly show as out of range
+* (Range) **Range check fallback** — added a fallback for classes without friendly range check spells so out-of-range fading now works for all classes
 * (Aura Designer) **Strata and frame level controls** — indicators can now be placed on different frame strata with a configurable default frame level
 * (Test Mode) **Aura Designer support in test mode** — Aura Designer indicators now render on test frames
 * (Aura Designer) **Out of range alpha** — new element-specific alpha slider for Aura Designer indicators (icons, squares, bars)
