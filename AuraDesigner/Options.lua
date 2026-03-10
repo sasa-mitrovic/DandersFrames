@@ -3087,12 +3087,14 @@ local function CreateFramePreview(parent, yOffset, rightPanelRef)
     local healthOffX = frameDB.healthTextX or 0
     local healthOffY = frameDB.healthTextY or 4
 
-    local hpText = mockFrame:CreateFontString(nil, "OVERLAY")
-    hpText:SetFont(healthFontPath, healthFontSize, "OUTLINE")
-    hpText:SetPoint(healthAnchor, mockFrame, healthAnchor, healthOffX, healthOffY)
-    hpText:SetText("72%")
-    hpText:SetTextColor(0.87, 0.87, 0.87, 1)
-    container.hpText = hpText
+    if frameDB.showHealthText ~= false then
+        local hpText = mockFrame:CreateFontString(nil, "OVERLAY")
+        hpText:SetFont(healthFontPath, healthFontSize, "OUTLINE")
+        hpText:SetPoint(healthAnchor, mockFrame, healthAnchor, healthOffX, healthOffY)
+        hpText:SetText("72%")
+        hpText:SetTextColor(0.87, 0.87, 0.87, 1)
+        container.hpText = hpText
+    end
 
     -- Border overlay (used when border effect is active)
     -- Uses highlight-compatible structure so DF.ApplyHighlightStyle can render all 6 modes

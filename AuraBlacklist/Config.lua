@@ -128,8 +128,9 @@ DF.AuraBlacklist.AlternateSpellIDs = {
     -- Symbiotic Relationship variants
     [474750] = 474754,
     [474760] = 474754,
-    -- Exhaustion variant
+    -- Exhaustion variants
     [390435] = 57723,
+    [428628] = 57723,    -- Harrier's Exhaustion (Harrier's Cry)
     -- Fatigued variant
     [264689] = 160455,
 }

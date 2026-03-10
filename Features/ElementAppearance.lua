@@ -257,13 +257,21 @@ end
 function DF:UpdateMissingHealthBarAppearance(frame)
     if not IsDandersFrame(frame) then return end
     if not frame.missingHealthBar then return end
-    
+
     -- Skip during test mode
     if DF.testMode or DF.raidTestMode then return end
-    
+
     local unit = frame.unit
     if not unit then return end
-    
+
+    -- OOR alpha for element-specific mode
+    local db = GetDB(frame)
+    if db and db.oorEnabled then
+        local inRange = GetInRange(frame)
+        local oorAlpha = db.oorMissingHealthAlpha or 0.2
+        ApplyOORAlpha(frame.missingHealthBar, inRange, 1.0, oorAlpha)
+    end
+
     -- SetMissingHealthBarValue handles the dead color override internally
     DF.SetMissingHealthBarValue(frame.missingHealthBar, unit, frame)
 end

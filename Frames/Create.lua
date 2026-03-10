@@ -57,7 +57,7 @@ end
 local function bindingMatchesMod(binding, activeMod)
     local mods = binding.modifiers and binding.modifiers:upper() or ""
     if activeMod == "" then return mods == "" end
-    return mods:find(activeMod) ~= nil
+    return mods == activeMod
 end
 
 -- Position the binding tooltip based on settings (mirrors PositionFrameTooltip pattern)

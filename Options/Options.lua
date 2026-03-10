@@ -629,6 +629,9 @@ function DF:SetupGUIPages(GUI, CreateCategory, CreateSubTab, BuildPage)
         local oorHealth = oorGroup:AddWidget(GUI:CreateSlider(self.child, "Health Bar Alpha", 0.0, 1.0, 0.05, db, "oorHealthBarAlpha", nil, function() DF:RefreshAllVisibleFrames() end, true), 55)
         oorHealth.hideOn = HideOOROptions
         
+        local oorMissingHealth = oorGroup:AddWidget(GUI:CreateSlider(self.child, "Missing Health Alpha", 0.0, 1.0, 0.05, db, "oorMissingHealthAlpha", nil, function() DF:RefreshAllVisibleFrames() end, true), 55)
+        oorMissingHealth.hideOn = HideOOROptions
+
         local oorBg = oorGroup:AddWidget(GUI:CreateSlider(self.child, "Background Alpha", 0.0, 1.0, 0.05, db, "oorBackgroundAlpha", nil, function() DF:RefreshAllVisibleFrames() end, true), 55)
         oorBg.hideOn = HideOOROptions
         

@@ -900,6 +900,7 @@ DF.ExportCategories = {
         "rangeCheckSpellID",
         "rangeFadeAlpha",
         "oorHealthBarAlpha",
+        "oorMissingHealthAlpha",
         "oorHealthTextAlpha",
         "oorBackgroundAlpha",
         "oorPowerBarAlpha",

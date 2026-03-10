@@ -449,6 +449,7 @@ end
 -- Apply visual styling to pet frame
 function DF:ApplyPetFrameStyle(frame)
     if not frame then return end
+    if InCombatLockdown() then return end
 
     local db = frame.isRaidFrame and DF:GetRaidDB() or DF:GetDB()
 

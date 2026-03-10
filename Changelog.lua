@@ -1,5 +1,5 @@
 local addonName, DF = ...
-DF.BUILD_DATE = "2026-03-08T21:59:08Z"
+DF.BUILD_DATE = "2026-03-09T17:53:32Z"
 DF.RELEASE_CHANNEL = "alpha"
 DF.CHANGELOG_TEXT = [===[
 # DandersFrames Changelog
@@ -7,24 +7,32 @@ DF.CHANGELOG_TEXT = [===[
 ## [4.0.14] - 2026-03-08
 
 ### Bug Fixes
-* (Fading) **Fixed power/resource bar not fading when out of range** — power bars stayed at full opacity while the rest of the frame faded
-* (Fading) **Fixed name text and health text not fading when units are dead or offline** in element-specific alpha mode
-* (Fading) **Fixed debuff borders staying visible when faded** — colored debuff borders now properly fade along with the icon
+* (Fading) **Fixed power/resource bar not fading when out of range**
+* (Fading) **Fixed name text and health text not fading when units are dead or offline**
+* (Fading) **Fixed debuff borders staying visible when faded**
 * (Fading) Fixed defensive icons not fading when using Direct API mode with multiple defensives
 * (Fading) Fixed name text flickering or staying at full alpha after switching specs
 * (Fading) Fixed range checking not updating after changing talents
 * (Missing Buff) Fixed missing buff indicator incorrectly showing on NPC followers in follower dungeons
 * (API) Fixed external API functions not returning arena frames — `GetFrameForUnit()`, `GetAllFrames()`, and `IterateFrames()` now work correctly inside arenas
 * (Side Menu) Improved hiding of Blizzard's raid/party side menu when disabled in settings
-* (Raid Frames) **Fixed hidden groups reappearing on roster changes** — groups hidden via group visibility settings would become visible when players joined, left, or moved between groups
-* (Raid Frames) **Fixed frames snapping to random positions on roster changes** — hidden groups corrupted the positioning slot calculations, causing visible groups to shift
-* (Raid Frames) **Fixed group order resetting on roster changes** — custom group display order was not preserved when the roster changed
-* (PvP) **Fixed health bars showing 100% in Battlegrounds** — a race condition caused UNIT_HEALTH events to be silently dropped during zone transitions, leaving health bars stuck at their initial value
-* (PvP) Fixed self-healing cooldown not resetting on zone transitions, delaying map rebuilds after entering a BG
-* (Test Mode) Fixed group visibility setting not applying in raid test mode — hidden groups now stay hidden
+* (Raid Frames) **Fixed hidden groups reappearing on roster changes**
+* (Raid Frames) **Fixed frames snapping to random positions on roster changes**
+* (Raid Frames) **Fixed group order resetting on roster changes**
+* (PvP) **Fixed health bars showing 100% in Battlegrounds**
+* (PvP) Fixed self-healing cooldown not resetting on zone transitions
+* (Test Mode) Fixed group visibility setting not applying in raid test mode
 * (Test Mode) Fixed custom group display order not applying in raid test mode
 * (Test Mode) Fixed "Columns Grow From" and "Reverse Order" dropdowns not updating flat raid test frames
-* (Test Mode) Fixed layout settings (spacing, growth direction, groups per row, etc.) not refreshing test frames when changed
+* (Test Mode) Fixed layout settings not refreshing test frames when changed
+
+### New Features
+* (Range) **Overhauled range check system** — improved accuracy for Death Knights, Evokers, and classes without healing spells; phased units now correctly show as out of range
+* (Aura Designer) **Strata and frame level controls** — indicators can now be placed on different frame strata with a configurable default frame level
+* (Test Mode) **Aura Designer support in test mode** — Aura Designer indicators now render on test frames
+
+### Improvements
+* (Test Mode) Redesigned test mode panel with collapsible sections, active count badges, and settings page quick-links
 
 ## [4.0.13] - 2026-03-08
 
