@@ -2209,7 +2209,7 @@ local function BuildTypeContent(parent, typeKey, auraName, width, optProxy, yOff
         end
         AddDivider()
         -- Sizing & appearance
-        AddWidget(GUI:CreateSlider(parent, "Size", 4, 64, 1, proxy, "size"), 54)
+        AddWidget(GUI:CreateSlider(parent, "Size", 8, 64, 1, proxy, "size"), 54)
         AddWidget(GUI:CreateSlider(parent, "Scale", 0.5, 3.0, 0.05, proxy, "scale"), 54)
         AddWidget(GUI:CreateColorPicker(parent, "Color", proxy, "color", true,
             function() if RefreshPreviewLightweight then RefreshPreviewLightweight() end end,
@@ -3352,10 +3352,23 @@ PopulateSpellGrid = function()
     for _, region in ipairs(regions) do region:Hide() end
 
     local spec = ResolveSpec()
-    if not spec then return end
-
-    local auras = Adapter:GetTrackableAuras(spec)
-    if not auras or #auras == 0 then return end
+    local auras = spec and Adapter:GetTrackableAuras(spec)
+    if not spec or not auras or #auras == 0 then
+        -- Show unsupported spec message
+        if not grid.unsupportedLabel then
+            local label = grid:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+            label:SetPoint("TOP", grid, "TOP", 0, -40)
+            label:SetWidth(grid:GetWidth() - 32)
+            label:SetJustifyH("CENTER")
+            label:SetTextColor(0.55, 0.55, 0.55, 1)
+            label:SetText("Aura Designer supports healer specs and Augmentation Evoker.\n\nYou can manually select a spec using the dropdown above to configure indicators in advance.")
+            grid.unsupportedLabel = label
+        end
+        grid.unsupportedLabel:Show()
+        return
+    end
+    -- Hide unsupported message if it was previously shown
+    if grid.unsupportedLabel then grid.unsupportedLabel:Hide() end
 
     local CARD_SIZE = 78
     local CARD_GAP = 6
@@ -4141,9 +4154,15 @@ BuildEffectsTab = function()
         local empty = parent:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
         empty:SetPoint("TOP", parent, "TOP", 0, yPos - 30)
         empty:SetWidth(220)
-        empty:SetText(activeFilter == "all"
-            and "No effects configured yet.\nClick '+ Add Indicator' to get started."
-            or "No " .. (PLACED_TYPE_LABELS[activeFilter] or FRAME_LEVEL_LABELS[activeFilter] or activeFilter) .. " effects configured.")
+        local spec = ResolveSpec()
+        local specAuras = spec and Adapter:GetTrackableAuras(spec)
+        if not spec or not specAuras or #specAuras == 0 then
+            empty:SetText("Aura Designer supports healer specs\nand Augmentation Evoker.\n\nSelect a spec using the dropdown above\nto configure indicators in advance.")
+        elseif activeFilter == "all" then
+            empty:SetText("No effects configured yet.\nClick '+ Add Indicator' to get started.")
+        else
+            empty:SetText("No " .. (PLACED_TYPE_LABELS[activeFilter] or FRAME_LEVEL_LABELS[activeFilter] or activeFilter) .. " effects configured.")
+        end
         empty:SetTextColor(C_TEXT_DIM.r, C_TEXT_DIM.g, C_TEXT_DIM.b, 0.7)
         empty:SetJustifyH("CENTER")
     else
@@ -5085,7 +5104,7 @@ function DF.BuildAuraDesignerPage(guiRef, pageRef, dbRef)
     -- Spell picker hint
     local pickerHint = spellPickerView:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     pickerHint:SetPoint("TOPLEFT", pickerHeader, "BOTTOMLEFT", 12, -8)
-    pickerHint:SetText("Click a spell to place it on the frame")
+    pickerHint:SetText("Click or drag a spell onto the frame to place it")
     pickerHint:SetTextColor(C_TEXT_DIM.r, C_TEXT_DIM.g, C_TEXT_DIM.b)
 
     -- Spell picker scroll frame for the grid
@@ -5195,6 +5214,40 @@ function DF:AuraDesigner_RefreshPage()
             mainFrame.splitContainer:ClearAllPoints()
             mainFrame.splitContainer:SetPoint("TOPLEFT", mainFrame, "TOPLEFT", 0, contentBaseY - totalShift)
             mainFrame.splitContainer:SetPoint("BOTTOMRIGHT", mainFrame, "BOTTOMRIGHT", 0, 0)
+        end
+    end
+
+    -- Show/hide disabled overlay on the split container
+    if mainFrame.splitContainer then
+        local adEnabled = GetAuraDesignerDB().enabled
+        if not adEnabled then
+            if not mainFrame.disabledOverlay then
+                local overlay = CreateFrame("Frame", nil, mainFrame.splitContainer)
+                overlay:SetAllPoints()
+                overlay:SetFrameLevel(mainFrame.splitContainer:GetFrameLevel() + 50)
+                overlay:EnableMouse(true)
+
+                local bg = overlay:CreateTexture(nil, "BACKGROUND")
+                bg:SetAllPoints()
+                bg:SetColorTexture(0.08, 0.08, 0.08, 0.85)
+
+                local label = overlay:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+                label:SetPoint("CENTER", 0, 10)
+                label:SetText("Aura Designer is disabled")
+                label:SetTextColor(0.6, 0.6, 0.6, 1)
+
+                local sublabel = overlay:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+                sublabel:SetPoint("TOP", label, "BOTTOM", 0, -4)
+                sublabel:SetText("Enable the checkbox above to use")
+                sublabel:SetTextColor(0.45, 0.45, 0.45, 1)
+
+                mainFrame.disabledOverlay = overlay
+            end
+            mainFrame.disabledOverlay:Show()
+        else
+            if mainFrame.disabledOverlay then
+                mainFrame.disabledOverlay:Hide()
+            end
         end
     end
 

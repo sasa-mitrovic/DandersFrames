@@ -74,6 +74,7 @@ DF.ExportCategories = {
         "raidFlatFrameAnchor",
         "raidFlatGrowthAnchor",
         "raidGroupAnchor",
+        "raidGroupRowGrowth",
         "raidGroupSpacing",
         "raidGroupsPerRow",
         "raidPlayerAnchor",

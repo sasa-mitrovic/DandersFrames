@@ -2143,7 +2143,8 @@ function DF:CreateRaidPositionHandler()
     handler:SetAttribute("growdirection", db.growDirection or "HORIZONTAL")
     handler:SetAttribute("groupsperrow", db.raidGroupsPerRow or 8)
     handler:SetAttribute("rowcolspacing", db.raidRowColSpacing or 30)
-    
+    handler:SetAttribute("grouprowgrowth", db.raidGroupRowGrowth or "START")
+
     -- Initialize display order attributes (default 1-8)
     local displayOrder = db.raidGroupDisplayOrder or {1, 2, 3, 4, 5, 6, 7, 8}
     for i = 1, 8 do
@@ -2178,7 +2179,8 @@ function DF:CreateRaidPositionHandler()
         local growDirection = handler:GetAttribute("growdirection") or "HORIZONTAL"
         local groupsPerRow = handler:GetAttribute("groupsperrow") or 8
         local rowColSpacing = handler:GetAttribute("rowcolspacing") or 30
-        
+        local groupRowGrowth = handler:GetAttribute("grouprowgrowth") or "START"
+
         if groupsPerRow < 1 then groupsPerRow = 1 end
         if groupsPerRow > 8 then groupsPerRow = 8 end
         
@@ -2409,14 +2411,17 @@ function DF:CreateRaidPositionHandler()
             local slotIndex = slot > 0 and (slot - 1) or 0
             local rcIdx = (slotIndex - slotIndex % groupsPerRow) / groupsPerRow
             local posInRC = slotIndex % groupsPerRow
-            
+            local isPartialRow = popRem > 0 and rcIdx == popRows - 1
+            if groupRowGrowth == "END" then
+                rcIdx = (fullGridRC - 1) - rcIdx
+            end
+
             if isHorizontal then
                 local xOff = posInRC * (groupWidth + groupSpacing)
                 local yOff = rcIdx * (groupHeight + rowColSpacing)
                 if slot > 0 and groupsGrowFrom == "END" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcW = gInRC * groupWidth + (gInRC - 1) * groupSpacing
                     xOff = (totalWidth - rcW) + posInRC * (groupWidth + groupSpacing)
                     if playerGrowFrom == "END" then
@@ -2426,8 +2431,7 @@ function DF:CreateRaidPositionHandler()
                     end
                 elseif slot > 0 and groupsGrowFrom == "CENTER" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcW = gInRC * groupWidth + (gInRC - 1) * groupSpacing
                     xOff = (totalWidth - rcW) / 2 + posInRC * (groupWidth + groupSpacing)
                     local yStart = (totalHeight - populatedHeight) / 2
@@ -2449,8 +2453,7 @@ function DF:CreateRaidPositionHandler()
                 local yOff = posInRC * (groupHeight + groupSpacing)
                 if slot > 0 and groupsGrowFrom == "END" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcH = gInRC * groupHeight + (gInRC - 1) * groupSpacing
                     yOff = (totalHeight - rcH) + posInRC * (groupHeight + groupSpacing)
                     if playerGrowFrom == "END" then
@@ -2460,8 +2463,7 @@ function DF:CreateRaidPositionHandler()
                     end
                 elseif slot > 0 and groupsGrowFrom == "CENTER" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcH = gInRC * groupHeight + (gInRC - 1) * groupSpacing
                     yOff = (totalHeight - rcH) / 2 + posInRC * (groupHeight + groupSpacing)
                     local xStart = (totalWidth - populatedWidth) / 2
@@ -2488,14 +2490,17 @@ function DF:CreateRaidPositionHandler()
             local slotIndex = slot > 0 and (slot - 1) or 1
             local rcIdx = (slotIndex - slotIndex % groupsPerRow) / groupsPerRow
             local posInRC = slotIndex % groupsPerRow
-            
+            local isPartialRow = popRem > 0 and rcIdx == popRows - 1
+            if groupRowGrowth == "END" then
+                rcIdx = (fullGridRC - 1) - rcIdx
+            end
+
             if isHorizontal then
                 local xOff = posInRC * (groupWidth + groupSpacing)
                 local yOff = rcIdx * (groupHeight + rowColSpacing)
                 if slot > 0 and groupsGrowFrom == "END" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcW = gInRC * groupWidth + (gInRC - 1) * groupSpacing
                     xOff = (totalWidth - rcW) + posInRC * (groupWidth + groupSpacing)
                     if playerGrowFrom == "END" then
@@ -2505,8 +2510,7 @@ function DF:CreateRaidPositionHandler()
                     end
                 elseif slot > 0 and groupsGrowFrom == "CENTER" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcW = gInRC * groupWidth + (gInRC - 1) * groupSpacing
                     xOff = (totalWidth - rcW) / 2 + posInRC * (groupWidth + groupSpacing)
                     local yStart = (totalHeight - populatedHeight) / 2
@@ -2528,8 +2532,7 @@ function DF:CreateRaidPositionHandler()
                 local yOff = posInRC * (groupHeight + groupSpacing)
                 if slot > 0 and groupsGrowFrom == "END" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcH = gInRC * groupHeight + (gInRC - 1) * groupSpacing
                     yOff = (totalHeight - rcH) + posInRC * (groupHeight + groupSpacing)
                     if playerGrowFrom == "END" then
@@ -2539,8 +2542,7 @@ function DF:CreateRaidPositionHandler()
                     end
                 elseif slot > 0 and groupsGrowFrom == "CENTER" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcH = gInRC * groupHeight + (gInRC - 1) * groupSpacing
                     yOff = (totalHeight - rcH) / 2 + posInRC * (groupHeight + groupSpacing)
                     local xStart = (totalWidth - populatedWidth) / 2
@@ -2567,14 +2569,17 @@ function DF:CreateRaidPositionHandler()
             local slotIndex = slot > 0 and (slot - 1) or 2
             local rcIdx = (slotIndex - slotIndex % groupsPerRow) / groupsPerRow
             local posInRC = slotIndex % groupsPerRow
-            
+            local isPartialRow = popRem > 0 and rcIdx == popRows - 1
+            if groupRowGrowth == "END" then
+                rcIdx = (fullGridRC - 1) - rcIdx
+            end
+
             if isHorizontal then
                 local xOff = posInRC * (groupWidth + groupSpacing)
                 local yOff = rcIdx * (groupHeight + rowColSpacing)
                 if slot > 0 and groupsGrowFrom == "END" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcW = gInRC * groupWidth + (gInRC - 1) * groupSpacing
                     xOff = (totalWidth - rcW) + posInRC * (groupWidth + groupSpacing)
                     if playerGrowFrom == "END" then
@@ -2584,8 +2589,7 @@ function DF:CreateRaidPositionHandler()
                     end
                 elseif slot > 0 and groupsGrowFrom == "CENTER" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcW = gInRC * groupWidth + (gInRC - 1) * groupSpacing
                     xOff = (totalWidth - rcW) / 2 + posInRC * (groupWidth + groupSpacing)
                     local yStart = (totalHeight - populatedHeight) / 2
@@ -2607,8 +2611,7 @@ function DF:CreateRaidPositionHandler()
                 local yOff = posInRC * (groupHeight + groupSpacing)
                 if slot > 0 and groupsGrowFrom == "END" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcH = gInRC * groupHeight + (gInRC - 1) * groupSpacing
                     yOff = (totalHeight - rcH) + posInRC * (groupHeight + groupSpacing)
                     if playerGrowFrom == "END" then
@@ -2618,8 +2621,7 @@ function DF:CreateRaidPositionHandler()
                     end
                 elseif slot > 0 and groupsGrowFrom == "CENTER" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcH = gInRC * groupHeight + (gInRC - 1) * groupSpacing
                     yOff = (totalHeight - rcH) / 2 + posInRC * (groupHeight + groupSpacing)
                     local xStart = (totalWidth - populatedWidth) / 2
@@ -2646,14 +2648,17 @@ function DF:CreateRaidPositionHandler()
             local slotIndex = slot > 0 and (slot - 1) or 3
             local rcIdx = (slotIndex - slotIndex % groupsPerRow) / groupsPerRow
             local posInRC = slotIndex % groupsPerRow
-            
+            local isPartialRow = popRem > 0 and rcIdx == popRows - 1
+            if groupRowGrowth == "END" then
+                rcIdx = (fullGridRC - 1) - rcIdx
+            end
+
             if isHorizontal then
                 local xOff = posInRC * (groupWidth + groupSpacing)
                 local yOff = rcIdx * (groupHeight + rowColSpacing)
                 if slot > 0 and groupsGrowFrom == "END" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcW = gInRC * groupWidth + (gInRC - 1) * groupSpacing
                     xOff = (totalWidth - rcW) + posInRC * (groupWidth + groupSpacing)
                     if playerGrowFrom == "END" then
@@ -2663,8 +2668,7 @@ function DF:CreateRaidPositionHandler()
                     end
                 elseif slot > 0 and groupsGrowFrom == "CENTER" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcW = gInRC * groupWidth + (gInRC - 1) * groupSpacing
                     xOff = (totalWidth - rcW) / 2 + posInRC * (groupWidth + groupSpacing)
                     local yStart = (totalHeight - populatedHeight) / 2
@@ -2686,8 +2690,7 @@ function DF:CreateRaidPositionHandler()
                 local yOff = posInRC * (groupHeight + groupSpacing)
                 if slot > 0 and groupsGrowFrom == "END" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcH = gInRC * groupHeight + (gInRC - 1) * groupSpacing
                     yOff = (totalHeight - rcH) + posInRC * (groupHeight + groupSpacing)
                     if playerGrowFrom == "END" then
@@ -2697,8 +2700,7 @@ function DF:CreateRaidPositionHandler()
                     end
                 elseif slot > 0 and groupsGrowFrom == "CENTER" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcH = gInRC * groupHeight + (gInRC - 1) * groupSpacing
                     yOff = (totalHeight - rcH) / 2 + posInRC * (groupHeight + groupSpacing)
                     local xStart = (totalWidth - populatedWidth) / 2
@@ -2725,14 +2727,17 @@ function DF:CreateRaidPositionHandler()
             local slotIndex = slot > 0 and (slot - 1) or 4
             local rcIdx = (slotIndex - slotIndex % groupsPerRow) / groupsPerRow
             local posInRC = slotIndex % groupsPerRow
-            
+            local isPartialRow = popRem > 0 and rcIdx == popRows - 1
+            if groupRowGrowth == "END" then
+                rcIdx = (fullGridRC - 1) - rcIdx
+            end
+
             if isHorizontal then
                 local xOff = posInRC * (groupWidth + groupSpacing)
                 local yOff = rcIdx * (groupHeight + rowColSpacing)
                 if slot > 0 and groupsGrowFrom == "END" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcW = gInRC * groupWidth + (gInRC - 1) * groupSpacing
                     xOff = (totalWidth - rcW) + posInRC * (groupWidth + groupSpacing)
                     if playerGrowFrom == "END" then
@@ -2742,8 +2747,7 @@ function DF:CreateRaidPositionHandler()
                     end
                 elseif slot > 0 and groupsGrowFrom == "CENTER" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcW = gInRC * groupWidth + (gInRC - 1) * groupSpacing
                     xOff = (totalWidth - rcW) / 2 + posInRC * (groupWidth + groupSpacing)
                     local yStart = (totalHeight - populatedHeight) / 2
@@ -2765,8 +2769,7 @@ function DF:CreateRaidPositionHandler()
                 local yOff = posInRC * (groupHeight + groupSpacing)
                 if slot > 0 and groupsGrowFrom == "END" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcH = gInRC * groupHeight + (gInRC - 1) * groupSpacing
                     yOff = (totalHeight - rcH) + posInRC * (groupHeight + groupSpacing)
                     if playerGrowFrom == "END" then
@@ -2776,8 +2779,7 @@ function DF:CreateRaidPositionHandler()
                     end
                 elseif slot > 0 and groupsGrowFrom == "CENTER" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcH = gInRC * groupHeight + (gInRC - 1) * groupSpacing
                     yOff = (totalHeight - rcH) / 2 + posInRC * (groupHeight + groupSpacing)
                     local xStart = (totalWidth - populatedWidth) / 2
@@ -2804,14 +2806,17 @@ function DF:CreateRaidPositionHandler()
             local slotIndex = slot > 0 and (slot - 1) or 5
             local rcIdx = (slotIndex - slotIndex % groupsPerRow) / groupsPerRow
             local posInRC = slotIndex % groupsPerRow
-            
+            local isPartialRow = popRem > 0 and rcIdx == popRows - 1
+            if groupRowGrowth == "END" then
+                rcIdx = (fullGridRC - 1) - rcIdx
+            end
+
             if isHorizontal then
                 local xOff = posInRC * (groupWidth + groupSpacing)
                 local yOff = rcIdx * (groupHeight + rowColSpacing)
                 if slot > 0 and groupsGrowFrom == "END" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcW = gInRC * groupWidth + (gInRC - 1) * groupSpacing
                     xOff = (totalWidth - rcW) + posInRC * (groupWidth + groupSpacing)
                     if playerGrowFrom == "END" then
@@ -2821,8 +2826,7 @@ function DF:CreateRaidPositionHandler()
                     end
                 elseif slot > 0 and groupsGrowFrom == "CENTER" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcW = gInRC * groupWidth + (gInRC - 1) * groupSpacing
                     xOff = (totalWidth - rcW) / 2 + posInRC * (groupWidth + groupSpacing)
                     local yStart = (totalHeight - populatedHeight) / 2
@@ -2844,8 +2848,7 @@ function DF:CreateRaidPositionHandler()
                 local yOff = posInRC * (groupHeight + groupSpacing)
                 if slot > 0 and groupsGrowFrom == "END" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcH = gInRC * groupHeight + (gInRC - 1) * groupSpacing
                     yOff = (totalHeight - rcH) + posInRC * (groupHeight + groupSpacing)
                     if playerGrowFrom == "END" then
@@ -2855,8 +2858,7 @@ function DF:CreateRaidPositionHandler()
                     end
                 elseif slot > 0 and groupsGrowFrom == "CENTER" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcH = gInRC * groupHeight + (gInRC - 1) * groupSpacing
                     yOff = (totalHeight - rcH) / 2 + posInRC * (groupHeight + groupSpacing)
                     local xStart = (totalWidth - populatedWidth) / 2
@@ -2883,14 +2885,17 @@ function DF:CreateRaidPositionHandler()
             local slotIndex = slot > 0 and (slot - 1) or 6
             local rcIdx = (slotIndex - slotIndex % groupsPerRow) / groupsPerRow
             local posInRC = slotIndex % groupsPerRow
-            
+            local isPartialRow = popRem > 0 and rcIdx == popRows - 1
+            if groupRowGrowth == "END" then
+                rcIdx = (fullGridRC - 1) - rcIdx
+            end
+
             if isHorizontal then
                 local xOff = posInRC * (groupWidth + groupSpacing)
                 local yOff = rcIdx * (groupHeight + rowColSpacing)
                 if slot > 0 and groupsGrowFrom == "END" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcW = gInRC * groupWidth + (gInRC - 1) * groupSpacing
                     xOff = (totalWidth - rcW) + posInRC * (groupWidth + groupSpacing)
                     if playerGrowFrom == "END" then
@@ -2900,8 +2905,7 @@ function DF:CreateRaidPositionHandler()
                     end
                 elseif slot > 0 and groupsGrowFrom == "CENTER" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcW = gInRC * groupWidth + (gInRC - 1) * groupSpacing
                     xOff = (totalWidth - rcW) / 2 + posInRC * (groupWidth + groupSpacing)
                     local yStart = (totalHeight - populatedHeight) / 2
@@ -2923,8 +2927,7 @@ function DF:CreateRaidPositionHandler()
                 local yOff = posInRC * (groupHeight + groupSpacing)
                 if slot > 0 and groupsGrowFrom == "END" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcH = gInRC * groupHeight + (gInRC - 1) * groupSpacing
                     yOff = (totalHeight - rcH) + posInRC * (groupHeight + groupSpacing)
                     if playerGrowFrom == "END" then
@@ -2934,8 +2937,7 @@ function DF:CreateRaidPositionHandler()
                     end
                 elseif slot > 0 and groupsGrowFrom == "CENTER" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcH = gInRC * groupHeight + (gInRC - 1) * groupSpacing
                     yOff = (totalHeight - rcH) / 2 + posInRC * (groupHeight + groupSpacing)
                     local xStart = (totalWidth - populatedWidth) / 2
@@ -2962,14 +2964,17 @@ function DF:CreateRaidPositionHandler()
             local slotIndex = slot > 0 and (slot - 1) or 7
             local rcIdx = (slotIndex - slotIndex % groupsPerRow) / groupsPerRow
             local posInRC = slotIndex % groupsPerRow
-            
+            local isPartialRow = popRem > 0 and rcIdx == popRows - 1
+            if groupRowGrowth == "END" then
+                rcIdx = (fullGridRC - 1) - rcIdx
+            end
+
             if isHorizontal then
                 local xOff = posInRC * (groupWidth + groupSpacing)
                 local yOff = rcIdx * (groupHeight + rowColSpacing)
                 if slot > 0 and groupsGrowFrom == "END" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcW = gInRC * groupWidth + (gInRC - 1) * groupSpacing
                     xOff = (totalWidth - rcW) + posInRC * (groupWidth + groupSpacing)
                     if playerGrowFrom == "END" then
@@ -2979,8 +2984,7 @@ function DF:CreateRaidPositionHandler()
                     end
                 elseif slot > 0 and groupsGrowFrom == "CENTER" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcW = gInRC * groupWidth + (gInRC - 1) * groupSpacing
                     xOff = (totalWidth - rcW) / 2 + posInRC * (groupWidth + groupSpacing)
                     local yStart = (totalHeight - populatedHeight) / 2
@@ -3002,8 +3006,7 @@ function DF:CreateRaidPositionHandler()
                 local yOff = posInRC * (groupHeight + groupSpacing)
                 if slot > 0 and groupsGrowFrom == "END" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcH = gInRC * groupHeight + (gInRC - 1) * groupSpacing
                     yOff = (totalHeight - rcH) + posInRC * (groupHeight + groupSpacing)
                     if playerGrowFrom == "END" then
@@ -3013,8 +3016,7 @@ function DF:CreateRaidPositionHandler()
                     end
                 elseif slot > 0 and groupsGrowFrom == "CENTER" then
                     local gInRC = groupsPerRow
-                    local lastRC = popRows - 1
-                    if rcIdx == lastRC and popRem > 0 then gInRC = popRem end
+                    if isPartialRow then gInRC = popRem end
                     local rcH = gInRC * groupHeight + (gInRC - 1) * groupSpacing
                     yOff = (totalHeight - rcH) / 2 + posInRC * (groupHeight + groupSpacing)
                     local xStart = (totalWidth - populatedWidth) / 2
@@ -3303,7 +3305,8 @@ function DF:UpdateRaidPositionAttributes()
         handler:SetAttribute("growdirection", db.growDirection or "HORIZONTAL")
         handler:SetAttribute("groupsperrow", db.raidGroupsPerRow or 8)
         handler:SetAttribute("rowcolspacing", db.raidRowColSpacing or 30)
-        
+        handler:SetAttribute("grouprowgrowth", db.raidGroupRowGrowth or "START")
+
         -- Update custom group display order
         DF:UpdateRaidGroupOrderAttributes()
     end

@@ -1,14 +1,39 @@
 local addonName, DF = ...
-DF.BUILD_DATE = "2026-03-09T17:53:32Z"
+DF.BUILD_DATE = "2026-03-10T19:58:12Z"
 DF.RELEASE_CHANNEL = "alpha"
 DF.CHANGELOG_TEXT = [===[
 # DandersFrames Changelog
+
+## [4.0.15] - 2026-03-10
+
+### Bug Fixes
+* (Fading) **Fixed combat stutter when leaving combat**
+* (Fading) **Fixed false out-of-range on units that were actually in range**
+* (Fading) **Fixed everyone always showing as in-range** — re-added polling timer as a safety net alongside event-driven updates
+* (Fading) **Fixed player frame being affected by out-of-range fading**
+* (Aura Designer) **Fixed indicators ignoring their configured alpha**
+* (Pet Frames) Fixed taint error when pet frame style changes during combat
+* (Aura Blacklist) Fixed Harrier's Exhaustion not being filterable
+* (Click Casting) Fixed binding tooltip showing wrong modifier
+* (Aura Designer) Fixed health text showing in indicator preview when disabled
+* (Side Menu) **Fixed side menu showing when not in a party or raid**
+
+### New Features
+* (Fading) **Hybrid range checking** — range now uses both instant events and a configurable polling timer for maximum reliability
+* (Fading) **Missing health bar out-of-range alpha** — new element-specific alpha slider for the missing health (damage) portion of the health bar
+* (Raid Frames) **Row/column growth direction** — new "Rows Grow From" setting controls whether additional rows of groups appear above or below the first row
+
+### Improvements
+* (Aura Designer) Added disabled state overlay — settings page now clearly shows when Aura Designer is disabled
+* (Aura Designer) Added unsupported spec message — spell picker now explains when a spec doesn't have built-in aura support
+* (Aura Designer) Updated spell picker hint to mention drag-and-drop
+* (Aura Designer) Increased minimum square indicator size from 4 to 8
 
 ## [4.0.14] - 2026-03-08
 
 ### Bug Fixes
 * (Fading) **Fixed power/resource bar not fading when out of range**
-* (Fading) **Fixed name text and health text not fading when units are dead or offline**
+* (Fading) **Fixed name text and health text not fading when out of range or dead/offline** in element-specific alpha mode
 * (Fading) **Fixed debuff borders staying visible when faded**
 * (Fading) Fixed defensive icons not fading when using Direct API mode with multiple defensives
 * (Fading) Fixed name text flickering or staying at full alpha after switching specs
@@ -27,9 +52,10 @@ DF.CHANGELOG_TEXT = [===[
 * (Test Mode) Fixed layout settings not refreshing test frames when changed
 
 ### New Features
-* (Range) **Overhauled range check system** — improved accuracy for Death Knights, Evokers, and classes without healing spells; phased units now correctly show as out of range
+* (Range) **Range check fallback** — added a fallback for classes without friendly range check spells so out-of-range fading now works for all classes
 * (Aura Designer) **Strata and frame level controls** — indicators can now be placed on different frame strata with a configurable default frame level
 * (Test Mode) **Aura Designer support in test mode** — Aura Designer indicators now render on test frames
+* (Aura Designer) **Out of range alpha** — new element-specific alpha slider for Aura Designer indicators (icons, squares, bars)
 
 ### Improvements
 * (Test Mode) Redesigned test mode panel with collapsible sections, active count badges, and settings page quick-links

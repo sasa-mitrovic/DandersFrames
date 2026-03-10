@@ -1184,7 +1184,11 @@ function DF:SetupGUIPages(GUI, CreateCategory, CreateSubTab, BuildPage)
         groupsPerRowSlider = groupLayoutGroup:AddWidget(GUI:CreateSlider(self.child, groupsLabel, 1, 8, 1, db, "raidGroupsPerRow", UpdateFrames, function() DF:LightweightUpdateRaidLayout() end, true), 55)
         
         groupLayoutGroup:AddWidget(GUI:CreateDropdown(self.child, "Groups Grow From", anchorOptions, db, "raidGroupAnchor", UpdateFrames), 55)
-        
+
+        local rowGrowLabel = db.growDirection == "VERTICAL" and "Columns Grow From" or "Rows Grow From"
+        local rowGrowOptions = db.growDirection == "VERTICAL" and { START = "Left", END = "Right" } or { START = "Top", END = "Bottom" }
+        groupLayoutGroup:AddWidget(GUI:CreateDropdown(self.child, rowGrowLabel, rowGrowOptions, db, "raidGroupRowGrowth", UpdateFrames), 55)
+
         local playerAnchorOptions = { START = "Start", END = "End" }
         groupLayoutGroup:AddWidget(GUI:CreateDropdown(self.child, "Players Grow From", playerAnchorOptions, db, "raidPlayerAnchor", UpdateFrames), 55)
         

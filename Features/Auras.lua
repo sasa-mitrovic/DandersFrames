@@ -2406,6 +2406,8 @@ local function InstallBlizzardHooks()
     -- Hook side menu frames to forcibly re-hide when Blizzard re-shows them
     -- SetAlpha(0) alone is insufficient — Blizzard code resets alpha on various events
     local function ShouldHideSideMenu()
+        -- Always hide side menu when solo — it's a party/raid UI element
+        if not IsInGroup() and not IsInRaid() then return true end
         local raidDb = DF:GetRaidDB()
         local partyDb = DF:GetDB()
         if not raidDb or not partyDb then return false end
@@ -2458,9 +2460,11 @@ function DF:UpdateBlizzardFrameVisibility()
     local raidDirectMode = raidDb.auraSourceMode == "DIRECT"
     DF.blizzardFramesFullyDisabled = (hidePartyFrames and partyDirectMode) or (hideRaidFrames and raidDirectMode)
     
-    -- Side menu visibility - check based on current mode
+    -- Side menu visibility - hide when solo, respect setting when grouped
     local showSideMenu
-    if IsInRaid() then
+    if not IsInGroup() and not IsInRaid() then
+        showSideMenu = false
+    elseif IsInRaid() then
         showSideMenu = raidDb.showBlizzardSideMenu
     else
         showSideMenu = partyDb.showBlizzardSideMenu

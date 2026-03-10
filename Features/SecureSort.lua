@@ -3537,6 +3537,7 @@ function SecureSort:UpdateRaidGroupLayoutParams()
         groupAnchor = db.raidGroupAnchor or "CENTER",
         playerAnchor = db.raidPlayerAnchor or "START",
         reverseGroupOrder = db.raidGroupOrder == "REVERSE",
+        groupRowGrowth = db.raidGroupRowGrowth or "START",
     }
     
     -- Apply pixel-perfect adjustments if enabled
@@ -3613,17 +3614,27 @@ function SecureSort:CalculateRaidGroupPosition(groupNum, posInGroup, playersInGr
     
     local rcIndex = math.floor((groupIndex - 1) / groupsPerRowCol) + 1  -- 1-based row/column index
     local posInRC = (groupIndex - 1) % groupsPerRowCol  -- 0-based position within row/column
-    
-    -- Apply reverse group order if enabled
+
+    -- Calculate groups in this row/column BEFORE any row growth flipping
     local groupsInThisRC = math.min(groupsPerRowCol, #activeGroupList - (rcIndex - 1) * groupsPerRowCol)
+
+    -- Apply row/column growth direction (use full 8-group grid so Row 1 never jumps)
+    local fullRowsCols = math.ceil(8 / groupsPerRowCol)
+    local groupRowGrowth = lp.groupRowGrowth or "START"
+    if groupRowGrowth == "END" then
+        rcIndex = fullRowsCols - rcIndex + 1
+    end
+
+    -- Apply reverse group order if enabled
     if reverseGroupOrder then
         posInRC = groupsInThisRC - 1 - posInRC
     end
     
-    -- Calculate total container dimensions
+    -- Calculate total container dimensions (use full grid when row growth is flipped)
+    local effectiveRowsCols = groupRowGrowth == "END" and fullRowsCols or numRowsCols
     local totalWidth, totalHeight
-    local maxCols = horizontal and groupsPerRowCol or numRowsCols
-    local maxRows = horizontal and numRowsCols or groupsPerRowCol
+    local maxCols = horizontal and groupsPerRowCol or effectiveRowsCols
+    local maxRows = horizontal and effectiveRowsCols or groupsPerRowCol
     
     if horizontal then
         totalWidth = maxCols * maxGroupWidth + (maxCols - 1) * groupSpacing
