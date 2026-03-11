@@ -48,15 +48,16 @@ local BINDING_SORT_ORDER = {
 local lines = {}
 
 local function getActiveModifier()
-    if IsShiftKeyDown() then return "SHIFT"
-    elseif IsControlKeyDown() then return "CTRL"
-    elseif IsAltKeyDown() then return "ALT"
-    else return "" end
+    local mods = ""
+    if IsShiftKeyDown() then mods = mods .. "shift-" end
+    if IsControlKeyDown() then mods = mods .. "ctrl-" end
+    if IsAltKeyDown() then mods = mods .. "alt-" end
+    if IsMetaKeyDown and IsMetaKeyDown() then mods = mods .. "meta-" end
+    return mods
 end
 
 local function bindingMatchesMod(binding, activeMod)
-    local mods = binding.modifiers and binding.modifiers:upper() or ""
-    if activeMod == "" then return mods == "" end
+    local mods = binding.modifiers or ""
     return mods == activeMod
 end
 

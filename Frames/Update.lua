@@ -772,7 +772,7 @@ function DF:UpdateUnitFrame(frame, source)
     -- ========================================
     -- NAME
     -- ========================================
-    DF:UpdateNameText(frame)
+    DF:UpdateName(frame)
     
     -- ========================================
     -- HEALTH TEXT

@@ -624,19 +624,28 @@ function DF:UpdatePetRange(frame)
     
     local cacheKey = "pet_" .. frame.unit
     local cached = rangeCache[cacheKey]
-    if cached == inRange then
+    local isSecret = issecretvalue and (issecretvalue(inRange) or issecretvalue(cached))
+    if not isSecret and cached == inRange then
         return
     end
     rangeCache[cacheKey] = inRange
-    
+
     frame.dfInRange = inRange
-    
+
     local outOfRangeAlpha = db.rangeFadeAlpha or 0.55
-    local targetAlpha = inRange and 1.0 or outOfRangeAlpha
-    
-    frame:SetAlpha(targetAlpha)
+    -- Use SetAlphaFromBoolean when available to handle secret booleans
+    -- from UnitInRange (Midnight+ returns secret values for non-healer specs)
+    if frame.SetAlphaFromBoolean then
+        frame:SetAlphaFromBoolean(inRange, 1.0, outOfRangeAlpha)
+    else
+        frame:SetAlpha(inRange and 1.0 or outOfRangeAlpha)
+    end
     if frame.healthBar then
-        frame.healthBar:SetAlpha(targetAlpha)
+        if frame.healthBar.SetAlphaFromBoolean then
+            frame.healthBar:SetAlphaFromBoolean(inRange, 1.0, outOfRangeAlpha)
+        else
+            frame.healthBar:SetAlpha(inRange and 1.0 or outOfRangeAlpha)
+        end
     end
 end
 
