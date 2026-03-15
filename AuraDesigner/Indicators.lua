@@ -736,18 +736,18 @@ local function ApplyBorderToOverlay(ch, frame, config, auraData)
             colorCurve = BuildExpiringColorCurve(config.expiringThreshold or 30, ec, oc, config.expiringThresholdMode),
             thresholdMode = config.expiringThresholdMode,
             color = ec, originalColor = oc,
-            originalAlpha = alpha, style = style, thickness = thickness, inset = inset,
+            originalAlpha = alpha, expiringAlpha = config.expiringAlpha or 1.0, style = style, thickness = thickness, inset = inset,
             applyResult = function(el, result, entry)
-                DF.ApplyHighlightStyle(el, entry.style, entry.thickness, entry.inset, result.r, result.g, result.b, entry.originalAlpha)
-                -- Detect expiring state via epsilon comparison against original color
                 local oc2 = entry.originalColor
                 local isExp = (math.abs(result.r - oc2.r) > 0.01 or math.abs(result.g - oc2.g) > 0.01 or math.abs(result.b - oc2.b) > 0.01)
+                local a = isExp and entry.expiringAlpha or entry.originalAlpha
+                DF.ApplyHighlightStyle(el, entry.style, entry.thickness, entry.inset, result.r, result.g, result.b, a)
                 UpdatePulseState(el, isExp)
             end,
             applyManual = function(el, isExp, entry)
                 if isExp then
                     local c = entry.color
-                    DF.ApplyHighlightStyle(el, entry.style, entry.thickness, entry.inset, c.r or 1, c.g or 0.2, c.b or 0.2, entry.originalAlpha)
+                    DF.ApplyHighlightStyle(el, entry.style, entry.thickness, entry.inset, c.r or 1, c.g or 0.2, c.b or 0.2, entry.expiringAlpha)
                 else
                     local c = entry.originalColor
                     DF.ApplyHighlightStyle(el, entry.style, entry.thickness, entry.inset, c.r, c.g, c.b, entry.originalAlpha)
