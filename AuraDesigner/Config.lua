@@ -286,14 +286,12 @@ DF.AuraDesigner.SecretAuraInfo = {
             HolyArmaments        = { signature = "0:1:0:0" },
             BlessingOfSacrifice  = { signature = "1:1:1:0" },
             BlessingOfFreedom    = { signature = "1:0:0:1" },
-            BeaconOfVirtue       = { signature = "1:0:0:0" },
             Dawnlight            = { signature = "0:1:0:0" },
         },
         casts = {
             [1022]   = { "BlessingOfProtection" },
             [432472] = { "HolyArmaments" },
             [6940]   = { "BlessingOfSacrifice" },
-            [200025] = { "BeaconOfVirtue" },
         },
     },
     AugmentationEvoker = {
@@ -376,7 +374,7 @@ DF.AuraDesigner.TrackableAuras = {
         { name = "BeaconOfFaith",       display = "Beacon of Faith",       color = {1.00, 0.84, 0.28} },
         { name = "EternalFlame",        display = "Eternal Flame",         color = {1.00, 0.60, 0.28} },
         { name = "BeaconOfLight",       display = "Beacon of Light",       color = {1.00, 0.93, 0.47} },
-        { name = "BeaconOfVirtue",      display = "Beacon of Virtue",      color = {1.00, 0.88, 0.37}, secret = true },
+        { name = "BeaconOfVirtue",      display = "Beacon of Virtue",      color = {1.00, 0.88, 0.37}, secret = false },
         { name = "BeaconOfTheSavior",   display = "Beacon of the Savior",  color = {0.93, 0.80, 0.47} },
         { name = "BlessingOfProtection", display = "Blessing of Protection", color = {0.94, 0.82, 0.31}, secret = true },
         { name = "HolyArmaments",        display = "Holy Armaments",         color = {0.81, 0.58, 0.93}, secret = true },
