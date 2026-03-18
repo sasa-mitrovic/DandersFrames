@@ -44,6 +44,7 @@ local INDICATOR_TYPES = {
     { key = "nametext",   label = "Name Text Color",  placed = false },
     { key = "healthtext", label = "Health Text Color", placed = false },
     { key = "framealpha", label = "Frame Alpha",      placed = false },
+    { key = "sound",      label = "Sound Alert",      placed = false },
 }
 
 local ANCHOR_OPTIONS = {
@@ -508,6 +509,17 @@ local function EnsureTypeConfig(auraName, typeKey)
                 expiringEnabled = false, expiringThreshold = 30, expiringThresholdMode = "PERCENT",
                 expiringAlpha = 1.0,
                 showWhenMissing = false,
+            }
+        elseif typeKey == "sound" then
+            auraCfg[typeKey] = {
+                enabled = false,
+                soundFile = nil,
+                soundLSMKey = nil,
+                volume = 0.8,
+                triggerMode = "ANY_MISSING",
+                combatMode = "ALWAYS",
+                startDelay = 2,
+                loopInterval = 3,
             }
         end
     end
@@ -1173,7 +1185,7 @@ local effectCardPool = {}   -- Reusable card frames
 -- the new Effects tab. Replaces the old per-aura view.
 -- ============================================================
 
-local FRAME_LEVEL_TYPE_KEYS = { "border", "healthbar", "nametext", "healthtext", "framealpha" }
+local FRAME_LEVEL_TYPE_KEYS = { "border", "healthbar", "nametext", "healthtext", "framealpha", "sound" }
 
 local FRAME_LEVEL_LABELS = {
     border     = "Border",
@@ -1181,6 +1193,7 @@ local FRAME_LEVEL_LABELS = {
     nametext   = "Name Text",
     healthtext = "Health Text",
     framealpha = "Frame Alpha",
+    sound      = "Sound Alert",
 }
 
 local PLACED_TYPE_LABELS = {
@@ -1198,6 +1211,7 @@ local BADGE_COLORS = {
     nametext   = { r = 0.72, g = 0.72, b = 0.94 },  -- Light blue
     healthtext = { r = 0.72, g = 0.72, b = 0.94 },  -- Light blue
     framealpha = { r = 0.60, g = 0.60, b = 0.60 },  -- Grey
+    sound      = { r = 0.94, g = 0.76, b = 0.24 },  -- Gold/yellow
 }
 
 -- Collect all configured effects into a flat, sorted list
@@ -4350,6 +4364,7 @@ BuildEffectsTab = function()
         { label = "Name Text Color",   type = "nametext"   },
         { label = "Health Text Color", type = "healthtext" },
         { label = "Frame Alpha",       type = "framealpha" },
+        { label = "Sound Alert",       type = "sound"      },
     }
 
     local my = -4
