@@ -27,6 +27,14 @@ local issecretvalue = issecretvalue or function() return false end
 local GetAuraDataByAuraInstanceID = C_UnitAuras and C_UnitAuras.GetAuraDataByAuraInstanceID
 local IsAuraFilteredOut = C_UnitAuras and C_UnitAuras.IsAuraFilteredOutByInstanceID
 
+-- Check if an interpolated color result differs from the original color.
+-- result.r/g/b may be secret (tainted) values from EvaluateRemainingDuration/Percent;
+-- arithmetic on secret values throws. If tainted, the engine IS interpolating → expiring.
+local function IsColorExpiring(result, oc)
+    if issecretvalue(result.r) then return true end
+    return (math.abs(result.r - oc.r) > 0.01 or math.abs(result.g - oc.g) > 0.01 or math.abs(result.b - oc.b) > 0.01)
+end
+
 DF.AuraDesigner = DF.AuraDesigner or {}
 
 local Indicators = {}
@@ -832,7 +840,7 @@ local function ApplyBorderToOverlay(ch, frame, config, auraData)
             originalAlpha = alpha, expiringAlpha = config.expiringAlpha or 1.0, style = style, thickness = thickness, inset = inset,
             applyResult = function(el, result, entry)
                 local oc2 = entry.originalColor
-                local isExp = (math.abs(result.r - oc2.r) > 0.01 or math.abs(result.g - oc2.g) > 0.01 or math.abs(result.b - oc2.b) > 0.01)
+                local isExp = IsColorExpiring(result, oc2)
                 local a = isExp and entry.expiringAlpha or entry.originalAlpha
                 DF.ApplyHighlightStyle(el, entry.style, entry.thickness, entry.inset, result.r, result.g, result.b, a)
                 UpdatePulseState(el, isExp)
@@ -982,7 +990,7 @@ function Indicators:ApplyHealthBar(frame, config, auraData)
             applyResult = function(el, result, entry)
                 el:SetStatusBarColor(result.r, result.g, result.b, entry.blend)
                 local oc2 = entry.originalColor
-                local isExp = (math.abs(result.r - oc2.r) > 0.01 or math.abs(result.g - oc2.g) > 0.01 or math.abs(result.b - oc2.b) > 0.01)
+                local isExp = IsColorExpiring(result, oc2)
                 UpdatePulseState(el, isExp)
             end,
             applyManual = function(el, isExp, entry)
@@ -1742,7 +1750,7 @@ function Indicators:ApplyIcon(frame, config, auraData, defaults, auraName, prior
                     el.border:SetColorTexture(result.r, result.g, result.b, result.a or 1)
                 end
                 local oc2 = entry.originalColor
-                local isExp = (math.abs(result.r - oc2.r) > 0.01 or math.abs(result.g - oc2.g) > 0.01 or math.abs(result.b - oc2.b) > 0.01)
+                local isExp = IsColorExpiring(result, oc2)
                 if el.adBorderPulseFrame then
                     UpdatePulseState(el.adBorderPulseFrame, isExp)
                 end
@@ -2267,7 +2275,7 @@ function Indicators:ApplySquare(frame, config, auraData, defaults, auraName, pri
                     el.texture:SetColorTexture(result.r, result.g, result.b, result.a or 1)
                 end
                 local oc2 = entry.originalColor
-                local isExp = (math.abs(result.r - oc2.r) > 0.01 or math.abs(result.g - oc2.g) > 0.01 or math.abs(result.b - oc2.b) > 0.01)
+                local isExp = IsColorExpiring(result, oc2)
                 if el.adFillPulseFrame then
                     UpdatePulseState(el.adFillPulseFrame, isExp)
                 end

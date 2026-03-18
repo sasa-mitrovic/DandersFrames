@@ -1,5 +1,5 @@
 local addonName, DF = ...
-DF.BUILD_DATE = "2026-03-17T16:40:21Z"
+DF.BUILD_DATE = "2026-03-18T10:21:47Z"
 DF.RELEASE_CHANNEL = "alpha"
 DF.CHANGELOG_TEXT = [===[
 # DandersFrames Changelog
@@ -24,6 +24,8 @@ DF.CHANGELOG_TEXT = [===[
 * (Aura Designer) Fixed pulsate animation not stopping when transitioning from expiring to missing state
 * (Aura Designer) Fixed Show When Missing indicators not appearing in test mode
 * (Sorting) Fixed secret string taint in cross-realm name caching
+* (Raid Frames) Fixed stack overflow when UpdateRaidHeaderVisibility and FlatRaidFrames.SetEnabled called each other in an infinite loop during profile switches
+* (Aura Designer) Fixed secret value taint error when expiring color interpolation returned restricted values — arithmetic on tainted `.r`/`.g`/`.b` fields now safely detected via `issecretvalue`
 
 ## [4.1.2] - 2026-03-16
 

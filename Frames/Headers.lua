@@ -4975,6 +4975,10 @@ function DF:UpdateRaidHeaderVisibility()
         DF.pendingRaidHeaderVisibility = true
         return
     end
+
+    -- Guard against infinite recursion: SetEnabled(false) calls back here
+    if DF._updatingRaidHeaderVisibility then return end
+    DF._updatingRaidHeaderVisibility = true
     
     -- Don't show live frames while in test mode
     if DF.testMode or DF.raidTestMode then
@@ -5056,6 +5060,8 @@ function DF:UpdateRaidHeaderVisibility()
             DF.FlatRaidFrames:SetEnabled(true)
         end
     end
+
+    DF._updatingRaidHeaderVisibility = nil
 
     -- Clear suppress flag and do a single authoritative reposition
     if DF.raidPositionHandler then
