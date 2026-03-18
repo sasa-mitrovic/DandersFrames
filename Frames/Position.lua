@@ -573,7 +573,8 @@ function DF:CreatePermanentMover(container, mode)
         DF.permanentMoverEventFrame = CreateFrame("Frame")
         DF.permanentMoverEventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
         DF.permanentMoverEventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
-        DF.permanentMoverEventFrame:SetScript("OnEvent", function()
+        DF.permanentMoverEventFrame:SetScript("OnEvent", function(_, event)
+            DF:Debug("POSITION", "Mover event: %s — scheduling anchor update in 0.2s", event)
             C_Timer.After(0.2, function()
                 DF:UpdatePermanentMoverAnchor("party")
                 DF:UpdatePermanentMoverAnchor("raid")
@@ -748,6 +749,9 @@ function DF:UpdatePermanentMoverAnchor(mode)
     local offsetY = db.permanentMoverOffsetY or 0
     local attachFrame = DF:GetPermanentMoverAttachFrame(mode)
 
+    DF:Debug("POSITION", "UpdatePermanentMoverAnchor(%s): anchor=%s offset=%.0f,%.0f attachFrame=%s",
+        mode, anchor, offsetX, offsetY, attachFrame and attachFrame:GetName() or "nil")
+
     handle:ClearAllPoints()
     handle:SetPoint(anchor, attachFrame, anchor, offsetX, offsetY)
 end
@@ -822,12 +826,15 @@ end
 
 function DF:UpdatePermanentMoverVisibility()
     local inCombat = InCombatLockdown()
+    DF:Debug("POSITION", "UpdatePermanentMoverVisibility: combat=%s", tostring(inCombat))
 
     -- Party
     if DF.permanentPartyMover then
         local db = DF:GetDB()
         -- Show if enabled and locked, but hide if raid test mode is active
         local show = db.permanentMover and db.locked and not DF.raidTestMode
+        DF:Debug("POSITION", "  Party mover: enabled=%s locked=%s show=%s",
+            tostring(db.permanentMover), tostring(db.locked), tostring(show))
         if show then
             if inCombat and db.permanentMoverHideInCombat then
                 DF.permanentPartyMover:Hide()
@@ -853,6 +860,8 @@ function DF:UpdatePermanentMoverVisibility()
     if DF.permanentRaidMover and DF.raidContainer then
         local db = DF:GetRaidDB()
         local raidEnabled = db.permanentMover
+        DF:Debug("POSITION", "  Raid mover: enabled=%s locked=%s inRaid=%s testMode=%s",
+            tostring(raidEnabled), tostring(db.raidLocked), tostring(IsInRaid()), tostring(DF.raidTestMode))
         -- In raid test mode, also show if party mover is enabled
         if DF.raidTestMode and not raidEnabled then
             raidEnabled = DF:GetDB().permanentMover

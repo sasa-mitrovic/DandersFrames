@@ -31,6 +31,9 @@
 * (Aura Designer) Fixed Show When Missing indicators not appearing in test mode
 * (Sorting) Fixed secret string taint in cross-realm name caching
 * (Raid Frames) Fixed stack overflow when UpdateRaidHeaderVisibility and FlatRaidFrames.SetEnabled called each other in an infinite loop during profile switches
+
+### Improvements
+* (Debug Console) Added comprehensive debug logging to roster update flow, header visibility management, flat raid operations, frame positioning/movers, and frame initialization — categories: ROSTER, VISIBILITY, FLATRAID, POSITION, LAYOUT
 * (Aura Designer) Fixed secret value taint error when expiring color interpolation returned restricted values — arithmetic on tainted `.r`/`.g`/`.b` fields now safely detected via `issecretvalue`
 
 ## [4.1.2] - 2026-03-16

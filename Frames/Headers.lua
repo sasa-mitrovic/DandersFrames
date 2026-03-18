@@ -522,6 +522,10 @@ function DF:InitializeHeaderChild(frame)
     frame.isArenaFrame = isArena  -- Arena uses party settings but raid units
     frame.isPinnedFrame = isPinned
     frame.dfIsRaidCombinedChild = isRaidCombined
+
+    DF:Debug("LAYOUT", "InitializeHeaderChild: parent=%s isRaid=%s isArena=%s isPinned=%s",
+        frame:GetParent() and frame:GetParent():GetName() or "nil",
+        tostring(isRaid), tostring(isArena), tostring(isPinned))
     
     -- Get appropriate DB and set frame size
     -- Arena frames use PARTY settings (same as party frames)
@@ -619,6 +623,8 @@ function DF:InitializeHeaderChild(frame)
             end
             
             DF:RosterDebugCount("OnAttributeChanged(unit)-PROCESSED")
+            DF:Debug("ROSTER", "OnAttributeChanged: %s -> %s (isRaid=%s)",
+                tostring(oldUnit), tostring(actualUnit), tostring(self.isRaidFrame))
             
             -- Clear old unit's cache
             if oldUnit then
@@ -811,6 +817,8 @@ function DF:InitializeHeaderChild(frame)
         -- Small delay to ensure unit is set
         C_Timer.After(0.05, function()
             if self and self.unit and self:IsVisible() then
+                DF:Debug("LAYOUT", "OnShow refresh: %s (headerChild=%s isRaid=%s)",
+                    self.unit or "?", tostring(self.dfIsHeaderChild), tostring(self.isRaidFrame))
                 -- Apply layout in case settings changed while hidden
                 -- SKIP for ALL header children - SetSize triggers SecureGroupHeader_Update
                 -- which repositions every sibling, causing visible frame jumping on roster changes.
@@ -3337,12 +3345,14 @@ end
 function DF:TriggerRaidPosition()
     -- Can't SetAttribute on secure frames during combat
     if InCombatLockdown() then
+        DF:Debug("POSITION", "TriggerRaidPosition: deferred (combat)")
         DF.pendingRaidPositionTrigger = true
         return
     end
-    
+
     if DF.raidPositionHandler then
         local v = DF.raidPositionHandler:GetAttribute("triggerposition") or 0
+        DF:Debug("POSITION", "TriggerRaidPosition: firing (counter=%d)", v + 1)
         DF.raidPositionHandler:SetAttribute("triggerposition", v + 1)
         
         if DF.debugHeaders then
@@ -3906,6 +3916,7 @@ function DF:ApplyRaidGroupSorting()
     -- partial repositions with stale group counts. A single authoritative
     -- reposition fires via UpdateRaidPositionAttributes after all groups
     -- are processed.
+    DF:Debug("ROSTER", "ApplyRaidGroupSorting: suppressing reposition, configuring 8 groups")
     if DF.raidPositionHandler then
         DF.raidPositionHandler:SetAttribute("suppressreposition", 1)
     end
@@ -4009,6 +4020,7 @@ function DF:ApplyRaidGroupSorting()
     
     -- Clear suppress flag — next TriggerRaidPosition will fire the full reposition
     -- with all group counts now accurately synced
+    DF:Debug("ROSTER", "ApplyRaidGroupSorting: unsuppressing, triggering authoritative reposition")
     if DF.raidPositionHandler then
         DF.raidPositionHandler:SetAttribute("suppressreposition", 0)
     end
@@ -4818,7 +4830,10 @@ function DF:UpdateHeaderVisibility(skipRaidReposition)
     local inArena = (contentType == "arena")
     local inRaid = IsInRaid() and not inArena  -- Raid but NOT arena
     local inParty = IsInGroup() and not IsInRaid()
-    
+
+    DF:Debug("VISIBILITY", "UpdateHeaderVisibility: content=%s inRaid=%s inParty=%s skipRaidRepos=%s",
+        contentType, tostring(inRaid), tostring(inParty), tostring(skipRaidReposition))
+
     -- ARENA DEBUG: Log the visibility decision
     local inInst, instType = IsInInstance()
     
@@ -4986,12 +5001,14 @@ function DF:UpdateRaidHeaderVisibility(skipReposition)
     -- Guard against infinite recursion: SetEnabled(false) calls back here
     if DF._updatingRaidHeaderVisibility then return end
     DF._updatingRaidHeaderVisibility = true
-    
+
+    DF:Debug("VISIBILITY", "UpdateRaidHeaderVisibility: skipReposition=%s", tostring(skipReposition))
+
     -- Don't show live frames while in test mode
     if DF.testMode or DF.raidTestMode then
         return
     end
-    
+
     local db = DF:GetRaidDB()
     
     -- Show container
@@ -5006,6 +5023,7 @@ function DF:UpdateRaidHeaderVisibility(skipReposition)
     end
 
     if db.raidUseGroups then
+        DF:Debug("VISIBILITY", "  Raid mode: GROUPED (separated headers)")
         -- Separated mode: show individual group headers
 
         -- CRITICAL: Hide FlatRaidFrames when switching to grouped mode
@@ -5050,6 +5068,7 @@ function DF:UpdateRaidHeaderVisibility(skipReposition)
             end
         end
     else
+        DF:Debug("VISIBILITY", "  Raid mode: FLAT (FlatRaidFrames)")
         -- Combined mode (flat layout): use FlatRaidFrames
 
         -- CRITICAL: Hide separated headers FIRST before enabling FlatRaidFrames
@@ -5078,7 +5097,10 @@ function DF:UpdateRaidHeaderVisibility(skipReposition)
         DF.raidPositionHandler:SetAttribute("suppressreposition", 0)
     end
     if not skipReposition then
+        DF:Debug("VISIBILITY", "  Triggering raid reposition (authoritative)")
         DF:TriggerRaidPosition()
+    else
+        DF:Debug("VISIBILITY", "  Skipping raid reposition (sorting will handle it)")
     end
 end
 
@@ -7621,7 +7643,10 @@ end)
 -- Separated roster update processing for debounce
 function DF:ProcessRosterUpdate()
     DF:RosterDebugEvent("Headers.lua:ProcessRosterUpdate")
-    
+    local numGroup = GetNumGroupMembers()
+    local inRaid = IsInRaid()
+    DF:Debug("ROSTER", "ProcessRosterUpdate: %d members, inRaid=%s", numGroup, tostring(inRaid))
+
     -- Clear range cache so stale unit→range mappings are flushed
     -- (moved here from Range.lua's own GROUP_ROSTER_UPDATE handler)
     if DF.ClearRangeCache then
@@ -7636,6 +7661,7 @@ function DF:ProcessRosterUpdate()
     
     -- ARENA: Special handling - uses party settings but raid unit IDs
     if inArena then
+        DF:Debug("ROSTER", "  Path: ARENA")
         -- Update visibility (shows arena header, hides party/raid)
         DF:UpdateHeaderVisibility()
         
@@ -7659,17 +7685,20 @@ function DF:ProcessRosterUpdate()
     
     -- RAID (not arena): Use flat layout handling
     if IsInRaid() and not raidDb.raidUseGroups then
+        DF:Debug("ROSTER", "  Path: FLAT RAID")
         -- If in combat, queue refresh for after combat
         if InCombatLockdown() then
+            DF:Debug("ROSTER", "  Deferred: combat lockdown (pendingFlatLayoutRefresh)")
             DF.pendingFlatLayoutRefresh = true
             return
         end
-        
+
         -- TEST 1: Visibility update - OK
         DF:UpdateHeaderVisibility()
-        
+
         -- TEST 2: HasRosterMembershipChanged check - OK
         if not HasRosterMembershipChanged() then
+            DF:Debug("ROSTER", "  Flat raid: roster unchanged, skipping sorting")
             -- FIX: Even though roster hasn't changed, unitFrameMap may be empty
             -- (e.g., after PLAYER_ENTERING_WORLD wiped it and OnAttributeChanged
             -- didn't fire because unit assignments are the same). Rebuild it.
@@ -7679,6 +7708,7 @@ function DF:ProcessRosterUpdate()
         
         -- Always call flat raid sorting - it handles sortEnabled=false internally
         -- This ensures stale nameList/groupBy attributes are cleared when sorting is disabled
+        DF:Debug("ROSTER", "  Flat raid: roster changed, applying sorting")
         DF:ApplyRaidFlatSorting()
         
         -- TEST 4: UpdateRestedIndicator - OK (group labels not needed for flat layout)
@@ -7699,6 +7729,7 @@ function DF:ProcessRosterUpdate()
     -- Skip raid reposition here — sorting below will trigger its own authoritative
     -- reposition with correct group counts. Firing here with stale counts causes
     -- visible frame jumping.
+    DF:Debug("ROSTER", "  Path: PARTY/GROUPED RAID (skipRaidReposition=true)")
     DF:UpdateHeaderVisibility(true)
     
     -- Update player group tracking for "Player's Group First" feature (raid only, not arena)
@@ -7710,6 +7741,7 @@ function DF:ProcessRosterUpdate()
     -- This prevents redundant sorting when GROUP_ROSTER_UPDATE fires multiple times
     -- with the same roster data
     if not HasRosterMembershipChanged() then
+        DF:Debug("ROSTER", "  Roster unchanged — skipping sorting, rebuilding unitFrameMap")
         -- Roster is identical - skip sorting
         -- Visibility update already handled above
         -- FIX: Rebuild unitFrameMap in case it was wiped (e.g., by PLAYER_ENTERING_WORLD)
@@ -7721,7 +7753,8 @@ function DF:ProcessRosterUpdate()
         end
         return
     end
-    
+
+    DF:Debug("ROSTER", "  Roster CHANGED — applying sorting")
     -- Roster actually changed - apply sorting
     -- NOTE: Sorting functions can't run during combat (they modify secure header attributes)
     -- Queue for after combat if in combat lockdown
@@ -7746,8 +7779,10 @@ function DF:ProcessRosterUpdate()
     if IsInRaid() and not inArena then
         -- Always call raid sorting - it handles sortEnabled=false internally
         if raidDb.raidUseGroups then
+            DF:Debug("ROSTER", "  Applying grouped raid sorting")
             DF:ApplyRaidGroupSorting()
         else
+            DF:Debug("ROSTER", "  Applying flat raid sorting")
             DF:ApplyRaidFlatSorting()
         end
         

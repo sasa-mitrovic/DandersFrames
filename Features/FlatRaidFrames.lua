@@ -756,6 +756,7 @@ end
 -- it expands symmetrically from its center point
 function FlatRaidFrames:ResizeInnerContainer()
     if not self.innerContainer or not self.header then return end
+    DF:Debug("FLATRAID", "ResizeInnerContainer: recalculating")
     
     local db = GetRaidDB()
     if not db then return end
@@ -796,7 +797,7 @@ function FlatRaidFrames:ResizeInnerContainer()
     end
     
     self.innerContainer:SetSize(width, height)
-    DebugPrint("ResizeInnerContainer:", width, "x", height, "(", visibleCount, "frames)")
+    DF:Debug("FLATRAID", "ResizeInnerContainer: %dx%d (%d visible, %d rows, %d cols)", width, height, visibleCount, rows, cols)
     
     -- Also update raidContainer and mover to max possible size
     self:UpdateContainerSize()
@@ -848,9 +849,11 @@ function FlatRaidFrames:UpdateSorting()
 
     if InCombatLockdown() then
         self.pendingNameListUpdate = true
-        DebugPrint("Sorting update deferred (combat)")
+        DF:Debug("FLATRAID", "UpdateSorting: deferred (combat lockdown)")
         return
     end
+
+    DF:Debug("FLATRAID", "UpdateSorting: starting")
 
     local db = GetRaidDB()
     if not db then return end
@@ -1022,9 +1025,11 @@ function FlatRaidFrames:SetEnabled(enabled)
         -- guard, the full Hide/Show + UpdateNameList runs twice per roster change,
         -- causing visible frame jumping.
         if header:IsShown() and self.innerContainer and self.innerContainer:IsShown() then
-            DebugPrint("SetEnabled(true): already visible, skipping full setup")
+            DF:Debug("FLATRAID", "SetEnabled(true): already visible, skipping full setup")
             return
         end
+
+        DF:Debug("FLATRAID", "SetEnabled(true): performing full setup")
 
         -- CRITICAL: Hide separated headers (group-based layout) when enabling flat mode
         -- This prevents having two sets of frames visible
@@ -1089,6 +1094,7 @@ function FlatRaidFrames:SetEnabled(enabled)
             end
         end)
     else
+        DF:Debug("FLATRAID", "SetEnabled(false): hiding flat raid frames")
         header:Hide()
         if self.innerContainer then
             self.innerContainer:Hide()
