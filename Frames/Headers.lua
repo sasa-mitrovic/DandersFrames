@@ -2158,7 +2158,11 @@ function DF:CreateRaidPositionHandler()
         local handler = self
         local container = handler:GetFrameRef("container")
         if not container then return end
-        
+
+        -- Batch mode: skip repositioning until all group counts are synced
+        local suppress = handler:GetAttribute("suppressreposition")
+        if suppress and suppress == 1 then return end
+
         -- Get all group refs explicitly (no string concat in loop)
         local group1 = handler:GetFrameRef("group1")
         local group2 = handler:GetFrameRef("group2")
@@ -3066,7 +3070,7 @@ function DF:CreateRaidPositionHandler()
                     local posHandler = self:GetFrameRef("positionHandler")
                     local groupIndex = self:GetAttribute("groupIndex")
                     if not posHandler or not groupIndex then return end
-                    
+
                     -- Count our own children using frameref-child prefix
                     local count = 0
                     local c1 = self:GetAttribute("frameref-child1")
@@ -3079,8 +3083,8 @@ function DF:CreateRaidPositionHandler()
                     if c3 and c3:IsShown() then count = count + 1 end
                     if c4 and c4:IsShown() then count = count + 1 end
                     if c5 and c5:IsShown() then count = count + 1 end
-                    
-                    -- Report our count
+
+                    -- Report our count (always update, even when suppressed)
                     if groupIndex == 1 then posHandler:SetAttribute("group1count", count)
                     elseif groupIndex == 2 then posHandler:SetAttribute("group2count", count)
                     elseif groupIndex == 3 then posHandler:SetAttribute("group3count", count)
@@ -3090,10 +3094,13 @@ function DF:CreateRaidPositionHandler()
                     elseif groupIndex == 7 then posHandler:SetAttribute("group7count", count)
                     elseif groupIndex == 8 then posHandler:SetAttribute("group8count", count)
                     end
-                    
-                    -- Trigger reposition
-                    local v = posHandler:GetAttribute("triggerposition") or 0
-                    posHandler:SetAttribute("triggerposition", v + 1)
+
+                    -- Trigger reposition (skip if batching — caller will trigger once at end)
+                    local suppress = posHandler:GetAttribute("suppressreposition")
+                    if not suppress or suppress ~= 1 then
+                        local v = posHandler:GetAttribute("triggerposition") or 0
+                        posHandler:SetAttribute("triggerposition", v + 1)
+                    end
                 end
             ]])
             
@@ -3161,7 +3168,7 @@ function DF:HookRaidChildrenForRepositioning()
                         local parentGroup = self:GetFrameRef("parentGroup")
                         local groupIndex = self:GetAttribute("parentGroupIndex")
                         if not posHandler or not parentGroup or not groupIndex then return end
-                        
+
                         -- Count parent's children using frameref-child prefix
                         local count = 0
                         local c1 = parentGroup:GetAttribute("frameref-child1")
@@ -3174,8 +3181,8 @@ function DF:HookRaidChildrenForRepositioning()
                         if c3 and c3:IsShown() then count = count + 1 end
                         if c4 and c4:IsShown() then count = count + 1 end
                         if c5 and c5:IsShown() then count = count + 1 end
-                        
-                        -- Set count based on index
+
+                        -- Set count based on index (always update, even when suppressed)
                         if groupIndex == 1 then posHandler:SetAttribute("group1count", count)
                         elseif groupIndex == 2 then posHandler:SetAttribute("group2count", count)
                         elseif groupIndex == 3 then posHandler:SetAttribute("group3count", count)
@@ -3185,10 +3192,13 @@ function DF:HookRaidChildrenForRepositioning()
                         elseif groupIndex == 7 then posHandler:SetAttribute("group7count", count)
                         elseif groupIndex == 8 then posHandler:SetAttribute("group8count", count)
                         end
-                        
-                        -- Trigger reposition
-                        local v = posHandler:GetAttribute("triggerposition") or 0
-                        posHandler:SetAttribute("triggerposition", v + 1)
+
+                        -- Trigger reposition (skip if batching — caller will trigger once at end)
+                        local suppress = posHandler:GetAttribute("suppressreposition")
+                        if not suppress or suppress ~= 1 then
+                            local v = posHandler:GetAttribute("triggerposition") or 0
+                            posHandler:SetAttribute("triggerposition", v + 1)
+                        end
                     ]])
                     
                     -- OnHide - count parent's children (excluding self) and trigger
@@ -3197,7 +3207,7 @@ function DF:HookRaidChildrenForRepositioning()
                         local parentGroup = self:GetFrameRef("parentGroup")
                         local groupIndex = self:GetAttribute("parentGroupIndex")
                         if not posHandler or not parentGroup or not groupIndex then return end
-                        
+
                         -- Count parent's children, excluding self since we're hiding
                         local count = 0
                         local c1 = parentGroup:GetAttribute("frameref-child1")
@@ -3210,8 +3220,8 @@ function DF:HookRaidChildrenForRepositioning()
                         if c3 and c3:IsShown() and c3 ~= self then count = count + 1 end
                         if c4 and c4:IsShown() and c4 ~= self then count = count + 1 end
                         if c5 and c5:IsShown() and c5 ~= self then count = count + 1 end
-                        
-                        -- Set count based on index
+
+                        -- Set count based on index (always update, even when suppressed)
                         if groupIndex == 1 then posHandler:SetAttribute("group1count", count)
                         elseif groupIndex == 2 then posHandler:SetAttribute("group2count", count)
                         elseif groupIndex == 3 then posHandler:SetAttribute("group3count", count)
@@ -3221,10 +3231,13 @@ function DF:HookRaidChildrenForRepositioning()
                         elseif groupIndex == 7 then posHandler:SetAttribute("group7count", count)
                         elseif groupIndex == 8 then posHandler:SetAttribute("group8count", count)
                         end
-                        
-                        -- Trigger reposition
-                        local v = posHandler:GetAttribute("triggerposition") or 0
-                        posHandler:SetAttribute("triggerposition", v + 1)
+
+                        -- Trigger reposition (skip if batching — caller will trigger once at end)
+                        local suppress = posHandler:GetAttribute("suppressreposition")
+                        if not suppress or suppress ~= 1 then
+                            local v = posHandler:GetAttribute("triggerposition") or 0
+                            posHandler:SetAttribute("triggerposition", v + 1)
+                        end
                     ]])
                     
                     if DF.debugHeaders then
@@ -3888,6 +3901,14 @@ function DF:ApplyRaidGroupSorting()
     end
     local roleOrderString = table.concat(groupingOrder, ",")
     
+    -- Suppress repositioning during the Hide/Show loop to prevent multiple
+    -- partial repositions with stale group counts. A single authoritative
+    -- reposition fires via UpdateRaidPositionAttributes after all groups
+    -- are processed.
+    if DF.raidPositionHandler then
+        DF.raidPositionHandler:SetAttribute("suppressreposition", 1)
+    end
+
     -- Configure each group header (SORTING ONLY - positioning handled by secure handler)
     for i = 1, 8 do
         local header = DF.raidSeparatedHeaders[i]
@@ -3985,6 +4006,12 @@ function DF:ApplyRaidGroupSorting()
         end
     end
     
+    -- Clear suppress flag — next TriggerRaidPosition will fire the full reposition
+    -- with all group counts now accurately synced
+    if DF.raidPositionHandler then
+        DF.raidPositionHandler:SetAttribute("suppressreposition", 0)
+    end
+
     -- Trigger positioning after sorting attributes are set
     -- This does both secure attribute updates AND Lua positioning
     DF:UpdateRaidPositionAttributes()
@@ -4961,14 +4988,20 @@ function DF:UpdateRaidHeaderVisibility()
         DF.raidContainer:Show()
     end
     
+    -- Suppress repositioning during show/hide loop to prevent multiple
+    -- partial repositions with stale group counts
+    if DF.raidPositionHandler then
+        DF.raidPositionHandler:SetAttribute("suppressreposition", 1)
+    end
+
     if db.raidUseGroups then
         -- Separated mode: show individual group headers
-        
+
         -- CRITICAL: Hide FlatRaidFrames when switching to grouped mode
         if DF.FlatRaidFrames and DF.FlatRaidFrames.header then
             DF.FlatRaidFrames:SetEnabled(false)
         end
-        
+
         if DF.raidSeparatedHeaders then
             for i = 1, 8 do
                 local header = DF.raidSeparatedHeaders[i]
@@ -4976,7 +5009,7 @@ function DF:UpdateRaidHeaderVisibility()
                     -- Show/hide based on group visibility settings
                     local showGroup = db.raidGroupVisible and db.raidGroupVisible[i]
                     if showGroup == nil then showGroup = true end  -- Default to show
-                    
+
                     if showGroup then
                         -- CRITICAL: Only call Show() if not already visible!
                         if not header:IsShown() then
@@ -5007,7 +5040,7 @@ function DF:UpdateRaidHeaderVisibility()
         end
     else
         -- Combined mode (flat layout): use FlatRaidFrames
-        
+
         -- CRITICAL: Hide separated headers FIRST before enabling FlatRaidFrames
         if DF.raidSeparatedHeaders then
             for i = 1, 8 do
@@ -5017,12 +5050,18 @@ function DF:UpdateRaidHeaderVisibility()
                 end
             end
         end
-        
+
         -- Enable FlatRaidFrames (which will also hide separated headers as a safeguard)
         if DF.FlatRaidFrames then
             DF.FlatRaidFrames:SetEnabled(true)
         end
     end
+
+    -- Clear suppress flag and do a single authoritative reposition
+    if DF.raidPositionHandler then
+        DF.raidPositionHandler:SetAttribute("suppressreposition", 0)
+    end
+    DF:TriggerRaidPosition()
 end
 
 -- Position raid group headers relative to each other within the container
