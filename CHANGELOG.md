@@ -8,6 +8,11 @@
 * (Auras) **Growth Direction Control** — replaced the single growth dropdown with a three-part control (Orientation, Wrap, Direction) for clearer configuration
 
 ### Bug Fixes
+* (Auto Layouts) Fixed duplicate raid frames appearing when switching between flat and grouped layouts via auto profiles
+* (Auto Layouts) Fixed hidden groups reappearing after combat when using auto layout switching
+* (Auto Layouts) Fixed raid layout not updating after combat when settings changed mid-fight
+* (Auto Layouts) Fixed flat raid container resize being silently skipped if combat started within 100ms of layout switch
+* (Raid Frames) Fixed raid group frames jumping/shifting position during roster changes — repositioning now batches all group count updates before a single reposition
 * (Aura Designer) Fixed indicators appearing on disabled pinned frames
 * (Aura Designer) Fixed Show When Missing icons being overridden by out-of-range alpha restore
 * (Aura Designer) Fixed frame alpha becoming fully transparent when using Show When Missing with expiring alpha override
