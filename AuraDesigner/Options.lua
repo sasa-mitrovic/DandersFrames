@@ -2697,7 +2697,7 @@ local function BuildTypeContent(parent, typeKey, auraName, width, optProxy, yOff
             end), 54)
 
             -- Custom file path (overrides LSM selection)
-            g:AddWidget(GUI:CreateTextInput(parent, "Custom Sound Path", proxy, "soundFile", nil, 280), 36)
+            g:AddWidget(GUI:CreateEditBox(parent, "Custom Sound Path", proxy, "soundFile", nil, 280), 44)
 
             -- Preview button
             local previewBtn = GUI:CreateButton(parent, "Preview Sound", function()
