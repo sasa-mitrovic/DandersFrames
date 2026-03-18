@@ -186,3 +186,171 @@ function SoundEngine:Evaluate(auraName, soundCfg, isMissing, inCombat)
         end
     end
 end
+
+-- ============================================================
+-- 1 HZ EVALUATION TICKER
+-- Iterates visible frames, queries adapter, evaluates sound state
+-- ============================================================
+
+function SoundEngine:RunEvaluation()
+    -- Suppression check (instance transitions)
+    if GetTime() < suppressUntil then return end
+
+    -- Must be in a group
+    if not IsInGroup() then
+        self:StopAll()
+        return
+    end
+
+    -- Lazy init adapter
+    if not Adapter then
+        Adapter = DF.AuraDesigner.Adapter
+    end
+    if not Adapter then return end
+
+    local mode = DF:GetCurrentMode()
+    local db = DF:GetDB(mode)
+    if not db or not db.auraDesigner or not db.auraDesigner.enabled then
+        self:StopAll()
+        return
+    end
+
+    local adDB = db.auraDesigner
+
+    -- Global mute check
+    if not adDB.soundEnabled then
+        self:StopAll()
+        return
+    end
+
+    -- Resolve spec
+    local spec
+    if adDB.spec == "auto" then
+        spec = Adapter:GetPlayerSpec()
+    else
+        spec = adDB.spec
+    end
+    if not spec then return end
+
+    local specAuras = adDB.auras and adDB.auras[spec]
+    if not specAuras then return end
+
+    -- Collect which auras have sound configs
+    wipe(presenceData)
+    local hasSoundAuras = false
+    for auraName, auraCfg in pairs(specAuras) do
+        if type(auraCfg) == "table" and auraCfg.sound and auraCfg.sound.enabled then
+            presenceData[auraName] = { present = 0, total = 0, soundCfg = auraCfg.sound }
+            hasSoundAuras = true
+        end
+    end
+
+    if not hasSoundAuras then
+        self:StopAll()
+        return
+    end
+
+    -- Iterate visible frames for the active mode
+    local header = (mode == "raid") and DF.raidHeader or DF.partyHeader
+    if not header then return end
+
+    local children = { header:GetChildren() }
+    for _, frame in ipairs(children) do
+        if frame:IsVisible() and frame.unit and UnitExists(frame.unit) then
+            -- Skip dead/disconnected units
+            if UnitIsConnected(frame.unit) and not UnitIsDeadOrGhost(frame.unit) then
+                local activeAuras = Adapter:GetUnitAuras(frame.unit, spec)
+
+                for auraName, pd in pairs(presenceData) do
+                    pd.total = pd.total + 1
+                    if activeAuras and activeAuras[auraName] then
+                        pd.present = pd.present + 1
+                    end
+                end
+            end
+        end
+    end
+
+    -- Evaluate each sound-configured aura
+    local inCombat = InCombatLockdown()
+    for auraName, pd in pairs(presenceData) do
+        local isMissing
+        local triggerMode = pd.soundCfg.triggerMode or "ANY_MISSING"
+
+        if pd.total == 0 then
+            isMissing = false
+        elseif triggerMode == "ALL_MISSING" then
+            isMissing = (pd.present == 0)
+        else  -- ANY_MISSING
+            isMissing = (pd.present < pd.total)
+        end
+
+        self:Evaluate(auraName, pd.soundCfg, isMissing, inCombat)
+    end
+
+    -- Stop sounds for auras that no longer have sound configs
+    for auraName, s in pairs(soundStates) do
+        if s.state ~= STATE_IDLE and not presenceData[auraName] then
+            self:TransitionTo(auraName, STATE_IDLE)
+        end
+    end
+end
+
+-- ============================================================
+-- CLEANUP
+-- ============================================================
+
+function SoundEngine:StopAll()
+    for auraName, s in pairs(soundStates) do
+        if s.state ~= STATE_IDLE then
+            self:TransitionTo(auraName, STATE_IDLE)
+        end
+    end
+end
+
+function SoundEngine:StopAura(auraName)
+    if soundStates[auraName] and soundStates[auraName].state ~= STATE_IDLE then
+        self:TransitionTo(auraName, STATE_IDLE)
+    end
+end
+
+-- ============================================================
+-- INITIALIZATION
+-- ============================================================
+
+local evaluationTicker
+
+function SoundEngine:Init()
+    if evaluationTicker then return end  -- Already initialized
+
+    -- 1 Hz evaluation ticker
+    evaluationTicker = C_Timer.NewTicker(1.0, function()
+        SoundEngine:RunEvaluation()
+    end)
+
+    -- Event frame for cleanup events
+    local eventFrame = CreateFrame("Frame")
+    eventFrame:RegisterEvent("PLAYER_SPECIALIZATION_CHANGED")
+    eventFrame:RegisterEvent("GROUP_ROSTER_UPDATE")
+    eventFrame:RegisterEvent("PLAYER_ENTERING_WORLD")
+
+    eventFrame:SetScript("OnEvent", function(_, event)
+        if event == "PLAYER_SPECIALIZATION_CHANGED" then
+            SoundEngine:StopAll()
+            DF:Debug("SoundEngine", "Spec changed — stopped all sounds")
+
+        elseif event == "GROUP_ROSTER_UPDATE" then
+            if not IsInGroup() then
+                SoundEngine:StopAll()
+                DF:Debug("SoundEngine", "Left group — stopped all sounds")
+            end
+
+        elseif event == "PLAYER_ENTERING_WORLD" then
+            suppressUntil = GetTime() + 3
+            SoundEngine:StopAll()
+            DF:Debug("SoundEngine", "Entering world — suppressing evaluation for 3s")
+        end
+    end)
+
+    DF:Debug("SoundEngine", "Initialized with 1 Hz evaluation ticker")
+end
