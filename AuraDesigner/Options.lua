@@ -3151,10 +3151,47 @@ local function CreateEnableBanner(parent)
         end
     end)
 
+    -- Mute Sound Alerts checkbox
+    local muteCb = CreateFrame("CheckButton", nil, banner)
+    muteCb:SetSize(16, 16)
+    muteCb:SetPoint("RIGHT", specLabel, "LEFT", -20, 0)
+
+    local muteBg = muteCb:CreateTexture(nil, "BACKGROUND")
+    muteBg:SetAllPoints()
+    muteBg:SetColorTexture(C_ELEMENT.r, C_ELEMENT.g, C_ELEMENT.b, 1)
+
+    local muteBorder = muteCb:CreateTexture(nil, "BORDER")
+    muteBorder:SetPoint("TOPLEFT", -1, 1)
+    muteBorder:SetPoint("BOTTOMRIGHT", 1, -1)
+    muteBorder:SetColorTexture(C_BORDER.r, C_BORDER.g, C_BORDER.b, 1)
+
+    local muteCheck = muteCb:CreateTexture(nil, "ARTWORK")
+    muteCheck:SetTexture("Interface\\AddOns\\DandersFrames\\Media\\Icons\\check")
+    muteCheck:SetVertexColor(tc.r, tc.g, tc.b)
+    muteCheck:SetPoint("CENTER")
+    muteCheck:SetSize(10, 10)
+    muteCb:SetCheckedTexture(muteCheck)
+
+    -- soundEnabled = true means NOT muted, so checked = not muted
+    muteCb:SetChecked(adDB and adDB.soundEnabled ~= false)
+    muteCb:SetScript("OnClick", function(self)
+        local adDB = GetAuraDesignerDB()
+        adDB.soundEnabled = self:GetChecked() and true or false
+        if not adDB.soundEnabled and DF.AuraDesigner.SoundEngine then
+            DF.AuraDesigner.SoundEngine:StopAll()
+        end
+    end)
+
+    local muteLabel = banner:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    muteLabel:SetPoint("RIGHT", muteCb, "LEFT", -4, 0)
+    muteLabel:SetText("Sound Alerts")
+    muteLabel:SetTextColor(C_TEXT_DIM.r, C_TEXT_DIM.g, C_TEXT_DIM.b)
+
     banner.UpdateSpecText = UpdateSpecText
     banner.checkbox = cb
     banner.specLabel = specLabel
     banner.specBtn = specBtn
+    banner.muteCheckbox = muteCb
     return banner
 end
 
