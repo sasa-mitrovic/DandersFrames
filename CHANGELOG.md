@@ -9,45 +9,21 @@
 * (Aura Designer) **Sound Alerts** — per-indicator sound alerts that play when an aura appears, expires, or is missing. Supports all LibSharedMedia sounds, adjustable volume, loop/one-shot modes, and a global "Mute All Sound Alerts" toggle in the Aura Designer banner. Includes a searchable sound dropdown picker.
 
 ### Bug Fixes
-* (Flat Raid Frames) Fixed frames jumping on roster changes — FlatRaidFrames handled GROUP_ROSTER_UPDATE directly AND via the throttled ProcessRosterUpdate, causing a double Hide/Show cycle on every join/leave
-* (Raid Frames) Fixed redundant double-reposition in grouped raid mode when roster changes — ApplyRaidGroupSorting already triggers positioning internally
-* (Flat Raid Frames) Fixed flat raid frames flickering between party and raid settings — child frames now have their `isRaidFrame` flag synced when the flat layout enables or refreshes
-* (Position) Fixed permanent mover handles for both party and raid staying visible after switching group type — mover visibility now re-evaluates during party/raid transitions
-* (Raid Frames) **Major fix** for grouped raid frames jumping on roster changes — root cause was `dfIsRaidCombinedChild` guard never matching grouped raid headers (`DandersRaidGroupNHeader` doesn't contain `RaidCombined`), so every OnShow called `ApplyFrameLayout` → `SetSize()` → `SecureGroupHeader_Update` cascade on all 30+ frames per reposition
-* (Raid Frames) Fixed unsuppress timing in ApplyRaidGroupSorting — suppress is now kept on during `UpdateRaidHeaderLayoutAttributes` (which clears child anchor points), preventing N independent position snippet runs when each child re-anchors
-* (Raid Frames) Fixed suppressreposition leak on unchanged roster — when `HasRosterMembershipChanged()` returned false, suppress was never cleared, blocking all future repositioning until the next real roster change
-* (Raid Frames) Removed redundant TriggerRaidPosition on unchanged roster path — the "poke for grow-from-center" was firing unnecessary repositions
-* (Flat Raid Frames) Fixed flat raid frames breaking position after alpha.5 — OnShow guard was too aggressive (blocked all header children from ApplyFrameLayout), now correctly only skips grouped raid children while allowing flat raid and party children to size normally
-* (Flat Raid Frames) Fixed flat raid SetEnabled early-return skipping child sizing — when already visible, now refreshes child frame sizes and isRaidFrame flag instead of returning empty-handed
-* (Flat Raid Frames) Fixed flat raid frames permanently using party settings after a party-to-raid transition — isRaidFrame flag is now structurally set to true instead of relying on IsInRaid() which returns false during transitional states
-* (Debug) Fixed format error in VISIBILITY debug logs — contentType not wrapped in tostring() causing string.format to throw when nil
-* (Aura Designer) Fixed custom border indicators not showing on the frame preview — preview now supports independent per-aura custom border overlays matching live frame behavior
-* (Sound Alerts) Fixed sound engine failing to find raid frames when using flat layout — now uses GetAllRaidFrames() instead of non-existent raidHeader
-* (Auto Layouts) Fixed duplicate raid frames appearing when switching between flat and grouped layouts via auto profiles
-* (Auto Layouts) Fixed hidden groups reappearing after combat when using auto layout switching
-* (Auto Layouts) Fixed raid layout not updating after combat when settings changed mid-fight
-* (Auto Layouts) Fixed flat raid container resize being silently skipped if combat started within 100ms of layout switch
-* (Raid Frames) Fixed raid group frames jumping/shifting position during roster changes — repositioning now batches all group count updates before a single reposition
-* (Raid Frames) **Major fix** for raid frame jumping on roster changes — suppress was not set before `UpdateRaidHeaderLayoutAttributes` ran inside `ApplyRaidGroupSorting`, allowing `ClearAllPoints`/`SetAttribute("point")` to trigger N unsuppressed child repositions before the authoritative reposition
-* (Flat Raid Frames) Fixed flat raid ProcessRosterUpdate calling `UpdateHeaderVisibility` without skipReposition, causing a redundant grouped-raid TriggerRaidPosition that flat raids don't use
-* (Aura Designer) Fixed grouped layout preview breaking after growth direction overhaul — `RefreshPreviewLightweight` still used old 4-direction code that didn't handle compound directions like `RIGHT_DOWN`, causing all grouped indicators to stack at position (0,0)
-* (Aura Designer) Fixed `iconsPerRow` default mismatch between preview (1) and engine (8) — legacy groups with nil `iconsPerRow` now render consistently
-* (Aura Designer) Added `sound` type to Engine.lua's `INDICATOR_TYPES` so sound-only auras participate in instance ID tracking for dedup
-* (Raid Frames) Fixed raid frame jumping when loading into LFR/BG — PEW was firing an immediate reposition with incomplete roster data (3 of 25 members), then each subsequent GROUP_ROSTER_UPDATE triggered another full sort+reposition as members trickled in
-* (Raid Frames) Added roster settling debounce for instance entry — rapid GROUP_ROSTER_UPDATE bursts are now coalesced into a single ProcessRosterUpdate after 0.3s of silence
-* (Flat Raid Frames) Fixed suppressreposition leak in flat raid ProcessRosterUpdate path — suppress was set by UpdateHeaderVisibility but never cleared after flat sorting, potentially blocking grouped-mode repositioning if the user later switched layouts
+* (Raid Frames) **Major fix** for raid frames jumping/shifting position when players join, leave, or when loading into LFR/BGs — completely reworked the reposition pipeline to batch all updates into a single authoritative reposition, with a settling debounce for instance loading
+* (Flat Raid Frames) Fixed flat raid frames flickering between party and raid settings during group transitions
+* (Flat Raid Frames) Fixed flat raid frame positioning breaking after layout or roster changes
+* (Position) Fixed mover handles for both party and raid staying visible after switching group type
+* (Auto Layouts) Fixed several issues with switching between flat and grouped layouts — duplicate frames, hidden groups reappearing after combat, and layout not updating after mid-fight settings changes
+* (Aura Designer) Fixed grouped layout preview not rendering correctly after the growth direction overhaul — indicators were stacking on top of each other instead of spreading out
+* (Aura Designer) Fixed custom border indicators not showing on the frame preview
 * (Aura Designer) Fixed indicators appearing on disabled pinned frames
-* (Aura Designer) Fixed Show When Missing icons being overridden by out-of-range alpha restore
-* (Aura Designer) Fixed frame alpha becoming fully transparent when using Show When Missing with expiring alpha override
-* (Aura Designer) Fixed stale duration text ("1") persisting on missing-state icons
-* (Aura Designer) Fixed pulsate animation not stopping when transitioning from expiring to missing state
-* (Aura Designer) Fixed Show When Missing indicators not appearing in test mode
+* (Aura Designer) Fixed several Show When Missing visual issues — out-of-range alpha, transparent frames, stale duration text, pulsate animation not stopping, and indicators not appearing in test mode
+* (Sound Alerts) Fixed sound engine not finding raid frames when using flat layout
+* (Sound Alerts) Sound-only auras now correctly tracked for buff bar dedup
 * (Sorting) Fixed secret string taint in cross-realm name caching
-* (Raid Frames) Fixed stack overflow when UpdateRaidHeaderVisibility and FlatRaidFrames.SetEnabled called each other in an infinite loop during profile switches
 
 ### Improvements
-* (Debug Console) Added comprehensive debug logging to roster update flow, header visibility management, flat raid operations, frame positioning/movers, and frame initialization — categories: ROSTER, VISIBILITY, FLATRAID, POSITION, LAYOUT
-* (Aura Designer) Fixed secret value taint error when expiring color interpolation returned restricted values — arithmetic on tainted `.r`/`.g`/`.b` fields now safely detected via `issecretvalue`
+* (Debug Console) Added comprehensive debug logging across roster updates, header visibility, flat raid operations, frame positioning, and frame layout — helps diagnose frame issues in the field
 
 ## [4.1.2] - 2026-03-16
 
