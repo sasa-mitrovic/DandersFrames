@@ -7034,7 +7034,7 @@ function DF:SetupGUIPages(GUI, CreateCategory, CreateSubTab, BuildPage)
         consoleSettingsGroup:AddWidget(logLevelDropdown, 55)
 
         -- Max Log Entries slider
-        local maxLinesSlider = GUI:CreateSlider(self.child, "Max Log Entries", 100, 2000, 100, debugProxy, "maxLines", function()
+        local maxLinesSlider = GUI:CreateSlider(self.child, "Max Log Entries", 100, 10000, 100, debugProxy, "maxLines", function()
             if DF.DebugConsole then
                 DF.DebugConsole:PruneLog()
                 DF.DebugConsole:RefreshDisplay()
