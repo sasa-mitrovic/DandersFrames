@@ -43,49 +43,52 @@ function DF:CreateMoverFrame()
     
     DF.moverFrame = mover
     
+    -- Shared drag state between OnDragStart/OnUpdate/OnDragStop
+    local dragOffsetX, dragOffsetY = 0, 0
+
     mover:SetScript("OnDragStart", function(self)
         DF.isDragging = true
-        -- Manual cursor tracking — work in raw pixel space to avoid
-        -- GetCenter() ambiguity on scaled frames (Grid2/Ellesmere approach)
+        -- Use saved db position as truth — avoids all GetCenter/GetLeft
+        -- ambiguity on scaled frames. Cursor position in UIParent coords.
+        local db = DF:GetDB()
+        local pScale = UIParent:GetEffectiveScale()
         local startCursorX, startCursorY = GetCursorPosition()
-        local effScale = DF.container:GetEffectiveScale()
-        -- GetLeft/GetRight/GetTop/GetBottom return visual bounds in UIParent coords
-        -- Multiply by UIParent effective scale to get raw pixels
-        local parentScale = UIParent:GetEffectiveScale()
-        local frameCX = ((DF.container:GetLeft() + DF.container:GetRight()) / 2) * parentScale
-        local frameCY = ((DF.container:GetTop() + DF.container:GetBottom()) / 2) * parentScale
-        -- Cursor offset from frame center in raw pixels
-        local dragOffX = frameCX - startCursorX
-        local dragOffY = frameCY - startCursorY
+        startCursorX = startCursorX / pScale
+        startCursorY = startCursorY / pScale
+        local screenWidth, screenHeight = GetScreenWidth(), GetScreenHeight()
+        -- The frame's visual center in UIParent coords (known from saved position)
+        local frameCX = screenWidth / 2 + (db.anchorX or 0)
+        local frameCY = screenHeight / 2 + (db.anchorY or 0)
+        local cursorOffX = frameCX - startCursorX
+        local cursorOffY = frameCY - startCursorY
+        -- Initialize shared drag state
+        dragOffsetX = db.anchorX or 0
+        dragOffsetY = db.anchorY or 0
 
         -- Start OnUpdate to track cursor and sync positions during drag
         self:SetScript("OnUpdate", function()
             local cursorX, cursorY = GetCursorPosition()
-            -- New frame center in raw pixels
-            local newCX = cursorX + dragOffX
-            local newCY = cursorY + dragOffY
-            -- Convert to UIParent coords
-            local pScale = UIParent:GetEffectiveScale()
-            local uiCX = newCX / pScale
-            local uiCY = newCY / pScale
-            -- Offset from screen center in UIParent coords
-            local screenWidth, screenHeight = GetScreenWidth(), GetScreenHeight()
-            local offsetX = uiCX - screenWidth / 2
-            local offsetY = uiCY - screenHeight / 2
+            local ps = UIParent:GetEffectiveScale()
+            cursorX = cursorX / ps
+            cursorY = cursorY / ps
+            -- New frame center = cursor + stored offset from cursor to frame center
+            local sw, sh = GetScreenWidth(), GetScreenHeight()
+            dragOffsetX = (cursorX + cursorOffX) - sw / 2
+            dragOffsetY = (cursorY + cursorOffY) - sh / 2
             -- Apply with frame scale compensation
             local frameScale = DF.container:GetScale() or 1
             DF.container:ClearAllPoints()
-            DF.container:SetPoint("CENTER", UIParent, "CENTER", offsetX / frameScale, offsetY / frameScale)
+            DF.container:SetPoint("CENTER", UIParent, "CENTER", dragOffsetX / frameScale, dragOffsetY / frameScale)
 
             -- Sync testPartyContainer to container position (for live preview)
             if DF.testPartyContainer then
                 DF.testPartyContainer:ClearAllPoints()
-                DF.testPartyContainer:SetPoint("CENTER", UIParent, "CENTER", offsetX / frameScale, offsetY / frameScale)
+                DF.testPartyContainer:SetPoint("CENTER", UIParent, "CENTER", dragOffsetX / frameScale, dragOffsetY / frameScale)
             end
 
             -- Snap preview if enabled
-            local db = DF:GetDB()
-            if db.snapToGrid and DF.gridFrame and DF.gridFrame:IsShown() then
+            local snapDb = DF:GetDB()
+            if snapDb.snapToGrid and DF.gridFrame and DF.gridFrame:IsShown() then
                 DF:UpdateSnapPreview(DF.container)
             end
         end)
@@ -100,17 +103,10 @@ function DF:CreateMoverFrame()
         -- Hide snap preview lines
         DF:HideSnapPreview()
 
-        -- Get current position — use GetLeft/GetRight for consistency with drag math
-        local parentScale = UIParent:GetEffectiveScale()
-        local rawCX = ((DF.container:GetLeft() + DF.container:GetRight()) / 2) * parentScale
-        local rawCY = ((DF.container:GetTop() + DF.container:GetBottom()) / 2) * parentScale
-        local uiCX = rawCX / parentScale
-        local uiCY = rawCY / parentScale
-        local screenWidth, screenHeight = GetScreenWidth(), GetScreenHeight()
-        local x = uiCX - screenWidth / 2
-        local y = uiCY - screenHeight / 2
+        -- Use the last computed offset from OnUpdate (stored in shared upvalues)
+        local x, y = dragOffsetX, dragOffsetY
 
-        -- Snap to grid if enabled - re-read db to ensure current state
+        -- Snap to grid if enabled
         local db = DF:GetDB()
         if db.snapToGrid and DF.gridFrame and DF.gridFrame:IsShown() then
             x, y = DF:SnapToGrid(x, y)
@@ -492,25 +488,30 @@ function DF:CreatePermanentMover(container, mode)
         self.fadeIn:Stop()
         self:SetAlpha(1)
 
+        -- Use saved db position as truth — avoids scale ambiguity
+        local dragDb = isRaid and DF:GetRaidDB() or DF:GetDB()
+        local pScale = UIParent:GetEffectiveScale()
         local startCursorX, startCursorY = GetCursorPosition()
-        local parentScale = UIParent:GetEffectiveScale()
-        local frameCX = ((container:GetLeft() + container:GetRight()) / 2) * parentScale
-        local frameCY = ((container:GetTop() + container:GetBottom()) / 2) * parentScale
-        local dragOffX = frameCX - startCursorX
-        local dragOffY = frameCY - startCursorY
+        startCursorX = startCursorX / pScale
+        startCursorY = startCursorY / pScale
+        local sw, sh = GetScreenWidth(), GetScreenHeight()
+        local anchorX = isRaid and (dragDb.raidAnchorX or 0) or (dragDb.anchorX or 0)
+        local anchorY = isRaid and (dragDb.raidAnchorY or 0) or (dragDb.anchorY or 0)
+        local frameCX = sw / 2 + anchorX
+        local frameCY = sh / 2 + anchorY
+        handle._cursorOffX = frameCX - startCursorX
+        handle._cursorOffY = frameCY - startCursorY
 
         -- Sync container and test containers live during drag
         self:SetScript("OnUpdate", function()
             local cursorX, cursorY = GetCursorPosition()
-            local newCX = cursorX + dragOffX
-            local newCY = cursorY + dragOffY
-            local pScale = UIParent:GetEffectiveScale()
-            local uiCX = newCX / pScale
-            local uiCY = newCY / pScale
+            local ps = UIParent:GetEffectiveScale()
+            cursorX = cursorX / ps
+            cursorY = cursorY / ps
 
-            local sw, sh = GetScreenWidth(), GetScreenHeight()
-            local ox = uiCX - sw / 2
-            local oy = uiCY - sh / 2
+            local sww, shh = GetScreenWidth(), GetScreenHeight()
+            local ox = (cursorX + handle._cursorOffX) - sww / 2
+            local oy = (cursorY + handle._cursorOffY) - shh / 2
 
             local s = container:GetScale() or 1
             container:ClearAllPoints()
@@ -545,11 +546,15 @@ function DF:CreatePermanentMover(container, mode)
 
         if InCombatLockdown() then return end
 
+        -- Compute final position from cursor (same math as OnUpdate)
+        -- to avoid GetCenter() ambiguity on scaled frames
+        local ps = UIParent:GetEffectiveScale()
+        local finalCursorX, finalCursorY = GetCursorPosition()
+        finalCursorX = finalCursorX / ps
+        finalCursorY = finalCursorY / ps
         local screenWidth, screenHeight = GetScreenWidth(), GetScreenHeight()
-        local centerX, centerY = container:GetCenter()
-        if not centerX or not centerY then return end
-        local x = centerX - screenWidth / 2
-        local y = centerY - screenHeight / 2
+        local x = (finalCursorX + self._cursorOffX) - screenWidth / 2
+        local y = (finalCursorY + self._cursorOffY) - screenHeight / 2
 
         if isRaid then
             local stopDb = DF:GetRaidDB()
