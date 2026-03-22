@@ -45,23 +45,36 @@ function DF:CreateMoverFrame()
     
     mover:SetScript("OnDragStart", function(self)
         DF.isDragging = true
-        DF.container:StartMoving()
-        
-        -- Start OnUpdate to sync test container position during drag
+        -- Manual cursor tracking instead of StartMoving() — WoW's StartMoving
+        -- doesn't handle scaled frames correctly and causes a position jump
+        local uiScale = UIParent:GetEffectiveScale()
+        local startMouseX, startMouseY = GetCursorPosition()
+        startMouseX = startMouseX / uiScale
+        startMouseY = startMouseY / uiScale
+        local startCX, startCY = DF.container:GetCenter()
+
+        -- Start OnUpdate to track cursor and sync positions during drag
         self:SetScript("OnUpdate", function()
-            local x, y = DF.container:GetCenter()
-            if x and y then
-                local screenWidth, screenHeight = GetScreenWidth(), GetScreenHeight()
-                local offsetX, offsetY = x - screenWidth/2, y - screenHeight/2
-                
-                -- Sync testPartyContainer to container position (for live preview)
-                if DF.testPartyContainer then
-                    local scale = DF.testPartyContainer:GetScale() or 1
-                    DF.testPartyContainer:ClearAllPoints()
-                    DF.testPartyContainer:SetPoint("CENTER", UIParent, "CENTER", offsetX / scale, offsetY / scale)
-                end
+            local mouseX, mouseY = GetCursorPosition()
+            mouseX = mouseX / uiScale
+            mouseY = mouseY / uiScale
+            local dx = mouseX - startMouseX
+            local dy = mouseY - startMouseY
+
+            local screenWidth, screenHeight = GetScreenWidth(), GetScreenHeight()
+            local offsetX = (startCX + dx) - screenWidth / 2
+            local offsetY = (startCY + dy) - screenHeight / 2
+
+            local scale = DF.container:GetScale() or 1
+            DF.container:ClearAllPoints()
+            DF.container:SetPoint("CENTER", UIParent, "CENTER", offsetX / scale, offsetY / scale)
+
+            -- Sync testPartyContainer to container position (for live preview)
+            if DF.testPartyContainer then
+                DF.testPartyContainer:ClearAllPoints()
+                DF.testPartyContainer:SetPoint("CENTER", UIParent, "CENTER", offsetX / scale, offsetY / scale)
             end
-            
+
             -- Snap preview if enabled
             local db = DF:GetDB()
             if db.snapToGrid and DF.gridFrame and DF.gridFrame:IsShown() then
@@ -69,29 +82,28 @@ function DF:CreateMoverFrame()
             end
         end)
     end)
-    
+
     mover:SetScript("OnDragStop", function(self)
-        DF.container:StopMovingOrSizing()
         DF.isDragging = false
-        
+
         -- Stop OnUpdate
         self:SetScript("OnUpdate", nil)
-        
+
         -- Hide snap preview lines
         DF:HideSnapPreview()
-        
+
         -- Get current position relative to screen center
         local screenWidth, screenHeight = GetScreenWidth(), GetScreenHeight()
         local centerX, centerY = DF.container:GetCenter()
         local x = centerX - screenWidth / 2
         local y = centerY - screenHeight / 2
-        
+
         -- Snap to grid if enabled - re-read db to ensure current state
         local db = DF:GetDB()
         if db.snapToGrid and DF.gridFrame and DF.gridFrame:IsShown() then
             x, y = DF:SnapToGrid(x, y)
         end
-        
+
         -- Apply snapped position
         local scale = DF.container:GetScale() or 1
         DF.container:ClearAllPoints()
@@ -102,12 +114,12 @@ function DF:CreateMoverFrame()
             DF.testPartyContainer:ClearAllPoints()
             DF.testPartyContainer:SetPoint("CENTER", UIParent, "CENTER", x / scale, y / scale)
         end
-        
+
         -- Save position
         db.anchorPoint = "CENTER"
         db.anchorX = x
         db.anchorY = y
-        
+
         -- Update position panel
         DF:UpdatePositionPanel()
     end)
@@ -458,6 +470,8 @@ function DF:CreatePermanentMover(container, mode)
     end)
 
     -- Drag handlers with combat protection
+    -- Manual cursor tracking instead of StartMoving() — WoW's StartMoving
+    -- doesn't handle scaled frames correctly and causes a position jump
     handle:SetScript("OnDragStart", function(self)
         if InCombatLockdown() then return end
         self.isDragging = true
@@ -465,24 +479,36 @@ function DF:CreatePermanentMover(container, mode)
         self.fadeOut:Stop()
         self.fadeIn:Stop()
         self:SetAlpha(1)
-        container:StartMoving()
 
-        -- Sync test containers live during drag
+        local uiScale = UIParent:GetEffectiveScale()
+        local startMouseX, startMouseY = GetCursorPosition()
+        startMouseX = startMouseX / uiScale
+        startMouseY = startMouseY / uiScale
+        local startCX, startCY = container:GetCenter()
+
+        -- Sync container and test containers live during drag
         self:SetScript("OnUpdate", function()
-            local cx, cy = container:GetCenter()
-            if not cx or not cy then return end
+            local mouseX, mouseY = GetCursorPosition()
+            mouseX = mouseX / uiScale
+            mouseY = mouseY / uiScale
+            local dx = mouseX - startMouseX
+            local dy = mouseY - startMouseY
+
             local sw, sh = GetScreenWidth(), GetScreenHeight()
-            local ox, oy = cx - sw / 2, cy - sh / 2
+            local ox = (startCX + dx) - sw / 2
+            local oy = (startCY + dy) - sh / 2
+
+            local s = container:GetScale() or 1
+            container:ClearAllPoints()
+            container:SetPoint("CENTER", UIParent, "CENTER", ox / s, oy / s)
 
             if isRaid then
                 if DF.testRaidContainer then
-                    local s = DF.testRaidContainer:GetScale() or 1
                     DF.testRaidContainer:ClearAllPoints()
                     DF.testRaidContainer:SetPoint("CENTER", UIParent, "CENTER", ox / s, oy / s)
                 end
             else
                 if DF.testPartyContainer then
-                    local s = DF.testPartyContainer:GetScale() or 1
                     DF.testPartyContainer:ClearAllPoints()
                     DF.testPartyContainer:SetPoint("CENTER", UIParent, "CENTER", ox / s, oy / s)
                 end
@@ -492,9 +518,6 @@ function DF:CreatePermanentMover(container, mode)
 
     handle:SetScript("OnDragStop", function(self)
         self.isDragging = false
-        if not InCombatLockdown() then
-            container:StopMovingOrSizing()
-        end
         self:SetScript("OnUpdate", nil)
 
         -- Re-evaluate hover state after drag ends

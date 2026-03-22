@@ -708,28 +708,42 @@ function DF:CreateRaidMoverFrame()
     DF.raidMoverFrame = mover
     
     mover:SetScript("OnDragStart", function(self)
-        -- Move the mover itself (not the container)
-        self:StartMoving()
-        
-        -- Start OnUpdate to sync positions during drag
+        -- Manual cursor tracking instead of StartMoving() — WoW's StartMoving
+        -- doesn't handle scaled frames correctly and causes a position jump
+        local uiScale = UIParent:GetEffectiveScale()
+        local startMouseX, startMouseY = GetCursorPosition()
+        startMouseX = startMouseX / uiScale
+        startMouseY = startMouseY / uiScale
+        local startCX, startCY = self:GetCenter()
+
+        -- Start OnUpdate to track cursor and sync positions during drag
         self:SetScript("OnUpdate", function()
-            local x, y = self:GetCenter()
-            if x and y then
-                local screenWidth, screenHeight = GetScreenWidth(), GetScreenHeight()
-                local offsetX, offsetY = x - screenWidth/2, y - screenHeight/2
-                local scale = self:GetScale() or 1
+            local mouseX, mouseY = GetCursorPosition()
+            mouseX = mouseX / uiScale
+            mouseY = mouseY / uiScale
+            local dx = mouseX - startMouseX
+            local dy = mouseY - startMouseY
 
-                -- Sync raidContainer to mover position
-                DF.raidContainer:ClearAllPoints()
-                DF.raidContainer:SetPoint("CENTER", UIParent, "CENTER", offsetX / scale, offsetY / scale)
+            local screenWidth, screenHeight = GetScreenWidth(), GetScreenHeight()
+            local offsetX = (startCX + dx) - screenWidth / 2
+            local offsetY = (startCY + dy) - screenHeight / 2
 
-                -- Sync testRaidContainer to mover position (for live preview)
-                if DF.testRaidContainer then
-                    DF.testRaidContainer:ClearAllPoints()
-                    DF.testRaidContainer:SetPoint("CENTER", UIParent, "CENTER", offsetX / scale, offsetY / scale)
-                end
+            local scale = self:GetScale() or 1
+
+            -- Reposition the mover
+            self:ClearAllPoints()
+            self:SetPoint("CENTER", UIParent, "CENTER", offsetX / scale, offsetY / scale)
+
+            -- Sync raidContainer to mover position
+            DF.raidContainer:ClearAllPoints()
+            DF.raidContainer:SetPoint("CENTER", UIParent, "CENTER", offsetX / scale, offsetY / scale)
+
+            -- Sync testRaidContainer to mover position (for live preview)
+            if DF.testRaidContainer then
+                DF.testRaidContainer:ClearAllPoints()
+                DF.testRaidContainer:SetPoint("CENTER", UIParent, "CENTER", offsetX / scale, offsetY / scale)
             end
-            
+
             -- Snap preview if enabled
             local db = DF:GetRaidDB()
             if db.snapToGrid and DF.gridFrame and DF.gridFrame:IsShown() then
@@ -737,32 +751,30 @@ function DF:CreateRaidMoverFrame()
             end
         end)
     end)
-    
+
     mover:SetScript("OnDragStop", function(self)
-        self:StopMovingOrSizing()
-        
         -- Stop OnUpdate
         self:SetScript("OnUpdate", nil)
-        
+
         -- Hide snap preview lines
         DF:HideSnapPreview()
-        
+
         -- Get current position relative to screen center
         local screenWidth, screenHeight = GetScreenWidth(), GetScreenHeight()
         local centerX, centerY = self:GetCenter()
         local x = centerX - screenWidth / 2
         local y = centerY - screenHeight / 2
-        
+
         -- Snap to grid if enabled
         local db = DF:GetRaidDB()
         if db.snapToGrid and DF.gridFrame and DF.gridFrame:IsShown() then
             x, y = DF:SnapToGrid(x, y)
         end
-        
+
         -- Save position
         db.raidAnchorX = x
         db.raidAnchorY = y
-        
+
         -- If editing an auto profile, also save as override
         if DF.AutoProfilesUI and DF.AutoProfilesUI:IsEditing() then
             DF.AutoProfilesUI:SetProfileSetting("raidAnchorX", x)
@@ -772,7 +784,7 @@ function DF:CreateRaidMoverFrame()
                 DF.GUI.UpdatePositionOverrideIndicator()
             end
         end
-        
+
         -- Apply final position to mover, container, and test container
         local scale = self:GetScale() or 1
         self:ClearAllPoints()
