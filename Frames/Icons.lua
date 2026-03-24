@@ -20,6 +20,7 @@ local UnitExists = UnitExists
 local InCombatLockdown = InCombatLockdown
 local GetPlayerAuraBySpellID = C_UnitAuras and C_UnitAuras.GetPlayerAuraBySpellID
 local GetUnitAuraBySpellID = C_UnitAuras and C_UnitAuras.GetUnitAuraBySpellID
+local issecretvalue = issecretvalue or function() return false end
 
 -- ============================================================
 -- MISSING BUFF CACHING (cached lookup optimization)

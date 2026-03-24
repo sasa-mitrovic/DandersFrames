@@ -2,6 +2,7 @@
 -- Tool for testing and exploring WoW aura APIs
 
 local addonName, DF = ...
+local issecretvalue = issecretvalue or function() return false end
 
 DF.DebugAuras = {}
 local DA = DF.DebugAuras
