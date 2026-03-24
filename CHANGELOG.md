@@ -1,5 +1,13 @@
 # DandersFrames Changelog
 
+## [4.1.5] - 2026-03-24
+
+### Bug Fixes
+* (Grouped Raids) Fix hidden groups sometimes showing frames when players join or are moved into them — hidden group headers are now fully neutralized (attributes cleared) so they can never claim or display units
+* (Auras) Remove private aura reanchor system — tokens auto-resolve in Midnight and the reanchor APIs are now combat-locked
+* (Auras) Use SetCooldownFromDurationObject for secret-safe aura cooldowns
+* (Auras) Add issecretvalue local cache to Icons.lua and DebugAuras.lua
+
 ## [4.1.4] - 2026-03-23
 
 ### New Features
@@ -7,7 +15,6 @@
 * (Pinned Frames) **Auto-Update by Role** — when auto-add role filters are active (tanks, healers, DPS), players whose role no longer matches are automatically removed. Manually added players and offline players are never auto-removed.
 
 ### Bug Fixes
-* (Grouped Raids) Fix hidden groups sometimes showing frames when players join or are moved into them — hidden group headers are now fully neutralized (attributes cleared) so they can never claim or display units
 * (Grouped Raids) Fix empty groups overlapping populated groups — empty groups were being positioned at their natural grid slot instead of being skipped, causing overlap when groups compact
 * (Grouped Raids) Fix groups sometimes overlapping on roster change — position handler now re-fires on every roster update to stay in sync with WoW's internal child re-sorting
 * (Flat Raids) Fix raid anchor moving when respeccing or dying — grouped-mode positioning was resizing the shared container when flat mode was active
