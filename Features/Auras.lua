@@ -33,10 +33,28 @@ local function SafeSetTexture(icon, texture)
     return false
 end
 
--- Safe cooldown setter
-local function SafeSetCooldown(cooldown, expirationTime, duration)
-    if cooldown and cooldown.SetCooldownFromExpirationTime then
-        cooldown:SetCooldownFromExpirationTime(expirationTime, duration)
+-- Safe cooldown setter (secret-safe via Duration objects)
+local function SafeSetCooldown(cooldown, auraData, unit)
+    if not cooldown then return end
+
+    -- Path 1: Real unit — get Duration object from the API (handles secrets)
+    if unit and auraData.auraInstanceID
+       and C_UnitAuras.GetAuraDuration
+       and cooldown.SetCooldownFromDurationObject then
+        local durationObj = C_UnitAuras.GetAuraDuration(unit, auraData.auraInstanceID)
+        if durationObj then
+            cooldown:SetCooldownFromDurationObject(durationObj)
+            return
+        end
+    end
+
+    -- Path 2: Non-secret fallback (preview/test mode)
+    local dur = auraData.duration
+    local exp = auraData.expirationTime
+    if dur and exp and not issecretvalue(dur) and not issecretvalue(exp) and dur > 0 then
+        if cooldown.SetCooldownFromExpirationTime then
+            cooldown:SetCooldownFromExpirationTime(exp, dur)
+        end
     end
 end
 
@@ -1466,12 +1484,12 @@ function DF:UpdateAuraIcons_Enhanced(frame, icons, auraType, maxAuras)
             end
 
             -- Set cooldown
-            SafeSetCooldown(icon.cooldown, auraData.expirationTime, auraData.duration)
-            
+            SafeSetCooldown(icon.cooldown, auraData, unit)
+
             -- Set stack count using new API if available
             icon.count:SetText("")
             local stackMinimum = icon.stackMinimum or 2
-            
+
             if auraInstanceID and C_UnitAuras and C_UnitAuras.GetAuraApplicationDisplayCount then
                 -- Use new API - pass min and max display count
                 -- API returns empty string if below min, "*" if above max, otherwise the count
@@ -1864,7 +1882,7 @@ function DF:UpdateAuraIconsDirect(frame, icons, auraType, maxAuras)
                     end
 
                     -- Set cooldown
-                    SafeSetCooldown(icon.cooldown, auraData.expirationTime, auraData.duration)
+                    SafeSetCooldown(icon.cooldown, auraData, unit)
 
                     -- Stack count
                     icon.count:SetText("")

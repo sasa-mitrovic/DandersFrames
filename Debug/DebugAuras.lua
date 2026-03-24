@@ -386,10 +386,24 @@ function DA:UpdateDebugBar(frame)
                 end
             end)
             
-            -- Set cooldown (wrap in pcall for secret values)
+            -- Set cooldown (secret-safe via Duration objects)
             pcall(function()
-                if icon.cooldown.SetCooldownFromExpirationTime and auraData.expirationTime and auraData.duration and auraData.duration > 0 then
-                    icon.cooldown:SetCooldownFromExpirationTime(auraData.expirationTime, auraData.duration)
+                if unit and auraData.auraInstanceID
+                   and C_UnitAuras.GetAuraDuration
+                   and icon.cooldown.SetCooldownFromDurationObject then
+                    local durationObj = C_UnitAuras.GetAuraDuration(unit, auraData.auraInstanceID)
+                    if durationObj then
+                        icon.cooldown:SetCooldownFromDurationObject(durationObj)
+                        return
+                    end
+                end
+                -- Fallback for non-secret values
+                if auraData.expirationTime and auraData.duration
+                   and not issecretvalue(auraData.expirationTime) and not issecretvalue(auraData.duration)
+                   and auraData.duration > 0 then
+                    if icon.cooldown.SetCooldownFromExpirationTime then
+                        icon.cooldown:SetCooldownFromExpirationTime(auraData.expirationTime, auraData.duration)
+                    end
                 else
                     icon.cooldown:Clear()
                 end

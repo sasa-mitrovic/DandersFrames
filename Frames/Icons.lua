@@ -104,13 +104,27 @@ local function SetDefensiveTexture()
     state.textureSet = true
 end
 
--- Module-level function for SetCooldownFromExpirationTime pcall
+-- Module-level function for cooldown pcall (secret-safe via Duration objects)
 local function SetDefensiveCooldown()
     local state = DefensiveBarState
     local cooldown = state.frame.defensiveIcon.cooldown
+    -- Use Duration object pipeline for secret-safe cooldown display
+    if state.unit and state.auraInstanceID
+       and C_UnitAuras.GetAuraDuration
+       and cooldown.SetCooldownFromDurationObject then
+        local durationObj = C_UnitAuras.GetAuraDuration(state.unit, state.auraInstanceID)
+        if durationObj then
+            cooldown:SetCooldownFromDurationObject(durationObj)
+            return
+        end
+    end
+    -- Fallback for non-secret values (test mode)
     local auraData = state.auraData
-    if cooldown.SetCooldownFromExpirationTime and auraData.expirationTime and auraData.duration then
-        cooldown:SetCooldownFromExpirationTime(auraData.expirationTime, auraData.duration)
+    if auraData and auraData.expirationTime and auraData.duration
+       and not issecretvalue(auraData.expirationTime) and not issecretvalue(auraData.duration) then
+        if cooldown.SetCooldownFromExpirationTime then
+            cooldown:SetCooldownFromExpirationTime(auraData.expirationTime, auraData.duration)
+        end
     end
 end
 
@@ -273,9 +287,21 @@ local function RenderDefensiveBarIcon(icon, unit, auraInstanceID, db, iconSize, 
     end
     icon.auraData.auraInstanceID = auraInstanceID
 
-    -- Cooldown
+    -- Cooldown (secret-safe via Duration objects)
     pcall(function()
-        if icon.cooldown.SetCooldownFromExpirationTime and auraData.expirationTime and auraData.duration then
+        if unit and auraInstanceID
+           and C_UnitAuras.GetAuraDuration
+           and icon.cooldown.SetCooldownFromDurationObject then
+            local durationObj = C_UnitAuras.GetAuraDuration(unit, auraInstanceID)
+            if durationObj then
+                icon.cooldown:SetCooldownFromDurationObject(durationObj)
+                return
+            end
+        end
+        -- Fallback for non-secret values
+        if auraData.expirationTime and auraData.duration
+           and not issecretvalue(auraData.expirationTime) and not issecretvalue(auraData.duration)
+           and icon.cooldown.SetCooldownFromExpirationTime then
             icon.cooldown:SetCooldownFromExpirationTime(auraData.expirationTime, auraData.duration)
         end
     end)
@@ -1636,9 +1662,23 @@ function DF:UpdateAuraIcons(frame, icons, filter, maxAuras)
                     auraIcon.auraData.auraInstanceID = auraInstanceID
                 end)
                 
-                -- Set cooldown - don't compare values, just try to call
+                -- Set cooldown (secret-safe via Duration objects)
                 pcall(function()
-                    auraIcon.cooldown:SetCooldownFromExpirationTime(auraData.expirationTime, auraData.duration)
+                    if unit and auraInstanceID
+                       and C_UnitAuras.GetAuraDuration
+                       and auraIcon.cooldown.SetCooldownFromDurationObject then
+                        local durationObj = C_UnitAuras.GetAuraDuration(unit, auraInstanceID)
+                        if durationObj then
+                            auraIcon.cooldown:SetCooldownFromDurationObject(durationObj)
+                            return
+                        end
+                    end
+                    -- Fallback for non-secret values
+                    if auraData.expirationTime and auraData.duration
+                       and not issecretvalue(auraData.expirationTime) and not issecretvalue(auraData.duration)
+                       and auraIcon.cooldown.SetCooldownFromExpirationTime then
+                        auraIcon.cooldown:SetCooldownFromExpirationTime(auraData.expirationTime, auraData.duration)
+                    end
                 end)
                 
                 -- Show/hide cooldown based on whether aura expires
