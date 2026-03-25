@@ -3,7 +3,7 @@
 ## [4.1.7] - 2026-03-25
 
 ### Bug Fixes
-* (Auras) Fix Blizzard data source showing no debuffs — Blizzard moved aura data from frame arrays to container objects in 12.0.8, updated reader to use new Iterate API
+* (Auras) Fix Blizzard data source showing no debuffs — Blizzard moved aura data from frame arrays to container objects in the latest update, updated reader to use new Iterate API
 * (Auras) Fix dispel overlay not working in Blizzard data source — use Direct API dispel filter (IsAuraFilteredOutByInstanceID) for secret-safe dispel detection since old dispelDebuffFrames no longer populated
 
 ### Changes
