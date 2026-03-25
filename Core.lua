@@ -3661,6 +3661,19 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
             end
         end
 
+        -- Force auraSourceMode to DIRECT for all existing profiles (v4.2.x)
+        -- One-time migration: users who prefer BLIZZARD can switch back manually
+        if DandersFramesDB_v2 and DandersFramesDB_v2.profiles then
+            for profileName, profile in pairs(DandersFramesDB_v2.profiles) do
+                for _, mode in ipairs({"party", "raid"}) do
+                    if profile[mode] and not profile[mode]._auraSourceModeDirectForced then
+                        profile[mode].auraSourceMode = "DIRECT"
+                        profile[mode]._auraSourceModeDirectForced = true
+                    end
+                end
+            end
+        end
+
         -- Recover from crash/disconnect during auto layout editing.
         -- If the recovery flag exists, the previous session was editing an auto layout
         -- when it crashed — _realRaidDB may still contain override values baked in.

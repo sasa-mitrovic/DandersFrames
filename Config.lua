@@ -882,7 +882,7 @@ DF.PartyDefaults = {
     buffFilterRaid = false,
 
     -- Aura Source Mode
-    auraSourceMode = "BLIZZARD",              -- "BLIZZARD" or "DIRECT"
+    auraSourceMode = "DIRECT",                -- "BLIZZARD" or "DIRECT"
 
     -- Direct Mode: Buff Filters
     directBuffShowAll = false,                -- Show all buffs (ignores sub-filters)
@@ -891,18 +891,18 @@ DF.PartyDefaults = {
     directBuffFilterRaidInCombat = true,      -- RAID_IN_COMBAT filter
     directBuffFilterCancelable = false,       -- CANCELABLE filter
     directBuffFilterNotCancelable = false,    -- NOT_CANCELABLE filter
-    directBuffFilterImportant = false,        -- IMPORTANT filter (12.0.1)
+    directBuffFilterImportant = true,         -- IMPORTANT filter (12.0.1)
     directBuffFilterBigDefensive = true,      -- BIG_DEFENSIVE filter (12.0.1)
     directBuffFilterExternalDefensive = true, -- EXTERNAL_DEFENSIVE filter (12.0.0)
-    directBuffSortOrder = "DEFAULT",          -- "DEFAULT" / "TIME" / "NAME"
+    directBuffSortOrder = "TIME",             -- "DEFAULT" / "TIME" / "NAME"
 
     -- Direct Mode: Debuff Filters
-    directDebuffShowAll = false,              -- Show all debuffs (ignores sub-filters)
+    directDebuffShowAll = true,               -- Show all debuffs (ignores sub-filters)
     directDebuffFilterRaid = true,            -- RAID filter
     directDebuffFilterRaidInCombat = true,    -- RAID_IN_COMBAT filter
     directDebuffFilterCrowdControl = true,    -- CROWD_CONTROL filter
     directDebuffFilterImportant = true,       -- IMPORTANT filter (12.0.1)
-    directDebuffSortOrder = "DEFAULT",        -- "DEFAULT" / "TIME" / "NAME"
+    directDebuffSortOrder = "TIME",           -- "DEFAULT" / "TIME" / "NAME"
 
     buffGrowth = "LEFT_UP",
     buffHideSwipe = false,
@@ -2095,7 +2095,7 @@ DF.RaidDefaults = {
     buffFilterRaid = false,
 
     -- Aura Source Mode
-    auraSourceMode = "BLIZZARD",              -- "BLIZZARD" or "DIRECT"
+    auraSourceMode = "DIRECT",                -- "BLIZZARD" or "DIRECT"
 
     -- Direct Mode: Buff Filters
     directBuffShowAll = false,                -- Show all buffs (ignores sub-filters)
@@ -2104,18 +2104,18 @@ DF.RaidDefaults = {
     directBuffFilterRaidInCombat = true,      -- RAID_IN_COMBAT filter
     directBuffFilterCancelable = false,       -- CANCELABLE filter
     directBuffFilterNotCancelable = false,    -- NOT_CANCELABLE filter
-    directBuffFilterImportant = false,        -- IMPORTANT filter (12.0.1)
+    directBuffFilterImportant = true,         -- IMPORTANT filter (12.0.1)
     directBuffFilterBigDefensive = true,      -- BIG_DEFENSIVE filter (12.0.1)
     directBuffFilterExternalDefensive = true, -- EXTERNAL_DEFENSIVE filter (12.0.0)
-    directBuffSortOrder = "DEFAULT",          -- "DEFAULT" / "TIME" / "NAME"
+    directBuffSortOrder = "TIME",             -- "DEFAULT" / "TIME" / "NAME"
 
     -- Direct Mode: Debuff Filters
-    directDebuffShowAll = false,              -- Show all debuffs (ignores sub-filters)
+    directDebuffShowAll = true,               -- Show all debuffs (ignores sub-filters)
     directDebuffFilterRaid = true,            -- RAID filter
     directDebuffFilterRaidInCombat = true,    -- RAID_IN_COMBAT filter
     directDebuffFilterCrowdControl = true,    -- CROWD_CONTROL filter
     directDebuffFilterImportant = true,       -- IMPORTANT filter (12.0.1)
-    directDebuffSortOrder = "DEFAULT",        -- "DEFAULT" / "TIME" / "NAME"
+    directDebuffSortOrder = "TIME",           -- "DEFAULT" / "TIME" / "NAME"
 
     buffGrowth = "LEFT_UP",
     buffHideSwipe = false,

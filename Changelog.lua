@@ -1,15 +1,27 @@
 local addonName, DF = ...
-DF.BUILD_DATE = "2026-03-23T15:34:08Z"
+DF.BUILD_DATE = "2026-03-24T22:27:56Z"
 DF.RELEASE_CHANNEL = "alpha"
 DF.CHANGELOG_TEXT = [===[
 # DandersFrames Changelog
+
+## Unreleased (v4.1.5-alpha.2)
+
+- Update changelog: restore private aura reanchor, add targeted spell stagger fix
+- fix: restore private aura reanchor system with combat lockdown
+- (Auras) Switch default aura data source to Direct API for all new and existing profiles — provides full control over buff/debuff filtering. Users can switch back to Blizzard mode in settings if preferred.
+- (Auras) Update default Direct API filters: enable Important Spells for buffs, show all debuffs, sort by time remaining
+
+---
+
 
 ## [4.1.5] - 2026-03-24
 
 ### Bug Fixes
 * (Grouped Raids) Fix hidden groups sometimes showing frames when players join or are moved into them — hidden group headers are now fully neutralized (attributes cleared) so they can never claim or display units
-* (Auras) Remove private aura reanchor system — tokens auto-resolve in Midnight and the reanchor APIs are now combat-locked
+* (Boss Debuffs) Fix private auras showing on wrong players after sorting or roster changes — restore reanchor system with combat lockdown guards so anchors rebind to the correct unit token
+* (Targeted Spells) Stagger icon pool creation for raid frames to prevent script-ran-too-long errors when 40 frames initialise simultaneously
 * (Auras) Use SetCooldownFromDurationObject for secret-safe aura cooldowns
+* (Auras) Add issecretvalue local cache to Icons.lua and DebugAuras.lua
 
 ## [4.1.4] - 2026-03-23
 
@@ -18,6 +30,8 @@ DF.CHANGELOG_TEXT = [===[
 * (Pinned Frames) **Auto-Update by Role** — when auto-add role filters are active (tanks, healers, DPS), players whose role no longer matches are automatically removed. Manually added players and offline players are never auto-removed.
 
 ### Bug Fixes
+* (Grouped Raids) Fix empty groups overlapping populated groups — empty groups were being positioned at their natural grid slot instead of being skipped, causing overlap when groups compact
+* (Grouped Raids) Fix groups sometimes overlapping on roster change — position handler now re-fires on every roster update to stay in sync with WoW's internal child re-sorting
 * (Flat Raids) Fix raid anchor moving when respeccing or dying — grouped-mode positioning was resizing the shared container when flat mode was active
 * (Flat Raids) Fix frames overlapping with grouped headers when auto layout switches from grouped to flat mode
 * (Pinned Frames) Fix frames drifting towards bottom-left when changing scale
