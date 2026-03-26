@@ -24,6 +24,12 @@ local UnitExists = UnitExists
 -- Track anchor IDs per frame for cleanup
 local frameAnchors = {}
 
+-- Track overlay anchor IDs per frame for cleanup
+local overlayAnchors = {}
+
+-- Forward declaration (defined after SetupPrivateAuraAnchors)
+local SetupOverlayAnchors
+
 -- Pending updates queue (for changes made during combat)
 local pendingUpdates = {}
 
@@ -224,8 +230,127 @@ function DF:SetupPrivateAuraAnchors(frame)
         end
     end
 
+    -- Set up frame border overlay if enabled
+    SetupOverlayAnchors(frame, unit, db)
+
     -- Track which unit anchors are monitoring
     frame.bossDebuffAnchoredUnit = unit
+end
+
+-- ============================================================
+-- FRAME BORDER OVERLAY SETUP
+-- Registers additional anchors with invisible icons but visible
+-- border rings sized to cover the entire unit frame.
+-- ============================================================
+
+SetupOverlayAnchors = function(frame, unit, db)
+    -- Clean up any existing overlay anchors
+    local oldOverlayAnchors = overlayAnchors[frame]
+    if oldOverlayAnchors then
+        for _, anchorID in ipairs(oldOverlayAnchors) do
+            pcall(function()
+                C_UnitAuras.RemovePrivateAuraAnchor(anchorID)
+            end)
+        end
+    end
+    overlayAnchors[frame] = {}
+
+    if not db.bossDebuffsOverlayEnabled then
+        -- Hide container if it exists
+        if frame.overlayContainer then
+            frame.overlayContainer:Hide()
+        end
+        return
+    end
+
+    local fw = frame:GetWidth()
+    local fh = frame:GetHeight()
+    if not fw or not fh or fw <= 0 or fh <= 0 then return end
+
+    local overlayScale = db.bossDebuffsOverlayScale or 1.05
+    local iconRatio = db.bossDebuffsOverlayIconRatio or 2.6
+    local overlayFrameLevel = db.bossDebuffsOverlayFrameLevel or 14
+    local maxSlots = db.bossDebuffsOverlayMaxSlots or 3
+    local clipBorder = db.bossDebuffsOverlayClipBorder ~= false
+
+    -- Icon dimensions: shrink by factor of 10, compensate with borderScale * 10
+    local iconW = fw * iconRatio / 10
+    local iconH = 0.001
+    local bScale = 2 * 10 * overlayScale
+
+    -- Create or reuse the overlay container
+    local container = frame.overlayContainer
+    if not container then
+        container = CreateFrame("Frame", nil, frame)
+        container:EnableMouse(false)
+        if container.SetMouseClickEnabled then container:SetMouseClickEnabled(false) end
+        if container.SetPropagateMouseMotion then container:SetPropagateMouseMotion(true) end
+        if container.SetPropagateMouseClicks then container:SetPropagateMouseClicks(true) end
+        frame.overlayContainer = container
+    end
+
+    container:ClearAllPoints()
+    container:SetPoint("CENTER", frame, "CENTER", 0, 0)
+    container:SetSize(fw, fh)
+    container:SetClipsChildren(clipBorder)
+    container:SetFrameStrata(frame:GetFrameStrata())
+    container:SetFrameLevel(frame:GetFrameLevel() + overlayFrameLevel)
+    container:Show()
+
+    -- Create or reuse sub-containers (one per aura slot)
+    if not frame.overlaySubContainers then
+        frame.overlaySubContainers = {}
+    end
+
+    for i = 1, maxSlots do
+        local sub = frame.overlaySubContainers[i]
+        if not sub then
+            sub = CreateFrame("Frame", nil, container)
+            sub:EnableMouse(false)
+            if sub.SetMouseClickEnabled then sub:SetMouseClickEnabled(false) end
+            frame.overlaySubContainers[i] = sub
+        end
+
+        sub:SetParent(container)
+        sub:ClearAllPoints()
+        sub:SetAllPoints(container)
+        sub:SetSize(0.001, 0.001)
+        sub:SetFrameStrata(container:GetFrameStrata())
+        sub:SetFrameLevel(container:GetFrameLevel() + (maxSlots - i))
+        sub:Show()
+
+        -- Register anchor with invisible icon, visible border
+        local success, anchorID = pcall(function()
+            return C_UnitAuras.AddPrivateAuraAnchor({
+                unitToken = unit,
+                auraIndex = i,
+                parent = sub,
+                showCountdownFrame = false,
+                showCountdownNumbers = false,
+                iconInfo = {
+                    iconWidth = math.max(iconW, 0.001),
+                    iconHeight = iconH,
+                    borderScale = bScale,
+                    iconAnchor = {
+                        point = "CENTER",
+                        relativeTo = sub,
+                        relativePoint = "CENTER",
+                        offsetX = 0,
+                        offsetY = 0,
+                    },
+                },
+            })
+        end)
+
+        if success and anchorID then
+            table.insert(overlayAnchors[frame], anchorID)
+        end
+    end
+
+    -- Hide extra sub-containers if maxSlots shrank
+    for i = maxSlots + 1, #frame.overlaySubContainers do
+        frame.overlaySubContainers[i]:Hide()
+    end
 end
 
 -- ============================================================
@@ -255,6 +380,22 @@ function DF:ClearPrivateAuraAnchors(frame)
             iconFrame:Hide()
             iconFrame:ClearAllPoints()
         end
+    end
+
+    -- Remove overlay anchors
+    local oAnchors = overlayAnchors[frame]
+    if oAnchors then
+        for _, anchorID in ipairs(oAnchors) do
+            pcall(function()
+                C_UnitAuras.RemovePrivateAuraAnchor(anchorID)
+            end)
+        end
+        overlayAnchors[frame] = nil
+    end
+
+    -- Hide overlay container (keep for reuse)
+    if frame.overlayContainer then
+        frame.overlayContainer:Hide()
     end
 
     frame.bossDebuffAnchoredUnit = nil
@@ -328,6 +469,57 @@ function DF:ReanchorPrivateAuras(frame)
 
             if success and anchorID then
                 table.insert(frameAnchors[frame], anchorID)
+            end
+        end
+    end
+
+    -- Reanchor overlay if it exists
+    local oldOverlayAnchors = overlayAnchors[frame]
+    if oldOverlayAnchors then
+        for _, anchorID in ipairs(oldOverlayAnchors) do
+            pcall(function()
+                C_UnitAuras.RemovePrivateAuraAnchor(anchorID)
+            end)
+        end
+    end
+    overlayAnchors[frame] = {}
+
+    if db.bossDebuffsOverlayEnabled and frame.overlaySubContainers then
+        local overlayScale = db.bossDebuffsOverlayScale or 1.05
+        local iconRatio = db.bossDebuffsOverlayIconRatio or 2.6
+        local maxSlots = db.bossDebuffsOverlayMaxSlots or 3
+        local fw = frame:GetWidth()
+        local iconW = fw * iconRatio / 10
+        local bScale = 2 * 10 * overlayScale
+
+        for i = 1, math.min(maxSlots, #frame.overlaySubContainers) do
+            local sub = frame.overlaySubContainers[i]
+            if sub and sub:IsShown() then
+                local success, anchorID = pcall(function()
+                    return C_UnitAuras.AddPrivateAuraAnchor({
+                        unitToken = newUnit,
+                        auraIndex = i,
+                        parent = sub,
+                        showCountdownFrame = false,
+                        showCountdownNumbers = false,
+                        iconInfo = {
+                            iconWidth = math.max(iconW, 0.001),
+                            iconHeight = 0.001,
+                            borderScale = bScale,
+                            iconAnchor = {
+                                point = "CENTER",
+                                relativeTo = sub,
+                                relativePoint = "CENTER",
+                                offsetX = 0,
+                                offsetY = 0,
+                            },
+                        },
+                    })
+                end)
+
+                if success and anchorID then
+                    table.insert(overlayAnchors[frame], anchorID)
+                end
             end
         end
     end
@@ -457,6 +649,32 @@ function DF:UpdateAllPrivateAuraVisibility()
                     iconFrame:Hide()
                 end
             end
+        end)
+    end)
+end
+
+-- ============================================================
+-- OVERLAY UPDATE FUNCTIONS
+-- ============================================================
+
+function DF:UpdateAllOverlayFrameLevel()
+    QueueOrExecute("overlayFrameLevel", function()
+        DF:IterateAllFrames(function(frame)
+            if not frame or not frame.overlayContainer then return end
+            local db = DF:GetFrameDB(frame)
+            local overlayFrameLevel = db.bossDebuffsOverlayFrameLevel or 14
+            frame.overlayContainer:SetFrameLevel(frame:GetFrameLevel() + overlayFrameLevel)
+        end)
+    end)
+end
+
+function DF:UpdateAllOverlayClip()
+    QueueOrExecute("overlayClip", function()
+        DF:IterateAllFrames(function(frame)
+            if not frame or not frame.overlayContainer then return end
+            local db = DF:GetFrameDB(frame)
+            local clipBorder = db.bossDebuffsOverlayClipBorder ~= false
+            frame.overlayContainer:SetClipsChildren(clipBorder)
         end)
     end)
 end
@@ -718,6 +936,13 @@ SlashCmdList["DFBOSSDEBUFFS"] = function(msg)
         print("  bossDebuffsEnabled: " .. tostring(db.bossDebuffsEnabled))
         print("  bossDebuffsMax: " .. tostring(db.bossDebuffsMax))
         print("  bossDebuffsHideTooltip: " .. tostring(db.bossDebuffsHideTooltip))
+        print("  bossDebuffsOverlayEnabled: " .. tostring(db.bossDebuffsOverlayEnabled))
+
+        local overlayAnchorCount = 0
+        for _, anchors in pairs(overlayAnchors) do
+            overlayAnchorCount = overlayAnchorCount + #anchors
+        end
+        print("|cff00ff00DandersFrames:|r Overlay anchors registered: " .. overlayAnchorCount)
 
     elseif msg == "frames" then
         print("|cff00ff00DandersFrames:|r Frame Debug:")
