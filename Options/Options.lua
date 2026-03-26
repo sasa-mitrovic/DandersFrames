@@ -4627,7 +4627,41 @@ function DF:SetupGUIPages(GUI, CreateCategory, CreateSubTab, BuildPage)
         frameLevel.hideOn = HideBossDebuffOptions
         sizeGroup.hideOn = HideBossDebuffOptions
         Add(sizeGroup, nil, 1)
-        
+
+        -- ===== FRAME BORDER OVERLAY GROUP (Column 2) =====
+        local overlayGroup = GUI:CreateSettingsGroup(self.child, 280)
+        overlayGroup:AddWidget(GUI:CreateHeader(self.child, "Frame Border Overlay"), 40)
+        overlayGroup:AddWidget(GUI:CreateLabel(self.child, "Shows a border ring around the entire frame when a boss debuff is active.", 250), 35)
+        overlayGroup:AddWidget(GUI:CreateCheckbox(self.child, "Enable Frame Border Overlay", db, "bossDebuffsOverlayEnabled", function()
+            self:RefreshStates()
+            if DF.RefreshAllPrivateAuraAnchors then DF:RefreshAllPrivateAuraAnchors() end
+        end), 30)
+        local function HideOverlayOptions(d)
+            return not d.bossDebuffsEnabled or not d.bossDebuffsOverlayEnabled
+        end
+        local ovScale = overlayGroup:AddWidget(GUI:CreateSlider(self.child, "Border Scale", 0.1, 5.0, 0.05, db, "bossDebuffsOverlayScale", nil, function()
+            if DF.RefreshAllPrivateAuraAnchors then DF:RefreshAllPrivateAuraAnchors() end
+        end, true), 55)
+        ovScale.hideOn = HideOverlayOptions
+        local ovRatio = overlayGroup:AddWidget(GUI:CreateSlider(self.child, "Icon Ratio", 0.5, 5.0, 0.1, db, "bossDebuffsOverlayIconRatio", nil, function()
+            if DF.RefreshAllPrivateAuraAnchors then DF:RefreshAllPrivateAuraAnchors() end
+        end, true), 55)
+        ovRatio.hideOn = HideOverlayOptions
+        local ovLevel = overlayGroup:AddWidget(GUI:CreateSlider(self.child, "Frame Level", 0, 50, 1, db, "bossDebuffsOverlayFrameLevel", nil, function()
+            if DF.UpdateAllOverlayFrameLevel then DF:UpdateAllOverlayFrameLevel() end
+        end, true), 55)
+        ovLevel.hideOn = HideOverlayOptions
+        local ovSlots = overlayGroup:AddWidget(GUI:CreateSlider(self.child, "Max Slots", 1, 5, 1, db, "bossDebuffsOverlayMaxSlots", nil, function()
+            if DF.RefreshAllPrivateAuraAnchors then DF:RefreshAllPrivateAuraAnchors() end
+        end, true), 55)
+        ovSlots.hideOn = HideOverlayOptions
+        local ovClip = overlayGroup:AddWidget(GUI:CreateCheckbox(self.child, "Clip Border to Frame", db, "bossDebuffsOverlayClipBorder", function()
+            if DF.UpdateAllOverlayClip then DF:UpdateAllOverlayClip() end
+        end), 30)
+        ovClip.hideOn = HideOverlayOptions
+        overlayGroup.hideOn = HideBossDebuffOptions
+        Add(overlayGroup, nil, 2)
+
         -- See Also links
         AddSpace(20, "both")
         Add(GUI:CreateSeeAlso(self.child, {
