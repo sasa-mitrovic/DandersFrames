@@ -16,6 +16,7 @@ local wipe = table.wipe
 local floor = math.floor
 local strsplit = strsplit
 local GetTime = GetTime
+local InCombatLockdown = InCombatLockdown
 
 -- Debug throttle: only log once per N seconds to avoid spam
 local debugLastLog = 0
@@ -673,9 +674,15 @@ function Engine:UpdateFrame(frame)
             elseif ind.typeKey == "bar" then
                 indicatorFrame = frame.dfAD_bars and frame.dfAD_bars[key]
             end
-            -- Configure if frame doesn't exist yet (first time) or version is stale
-            if not indicatorFrame or indicatorFrame.dfAD_configVersion ~= (DF.adConfigVersion or 0) then
-                Indicators:Configure(frame, ind.typeKey, config, adDB.defaults, key, ind.priority)
+            -- Configure if version is stale — but only outside combat since
+            -- SetPropagateMouseMotion/Clicks are protected functions.
+            -- Pre-warm (below) ensures frames are created and configured before combat.
+            -- If a brand-new aura appears mid-combat, it runs without Configure
+            -- and gets configured on PLAYER_REGEN_ENABLED via adConfigVersion mismatch.
+            if not InCombatLockdown() then
+                if not indicatorFrame or indicatorFrame.dfAD_configVersion ~= (DF.adConfigVersion or 0) then
+                    Indicators:Configure(frame, ind.typeKey, config, adDB.defaults, key, ind.priority)
+                end
             end
         end
 
@@ -930,6 +937,46 @@ function Engine:UpdateTestFrame(frame)
 end
 
 -- ============================================================
+-- PRE-WARM INDICATOR FRAMES
+-- Pre-creates and configures all indicator frames defined in
+-- AD config so they are ready before combat. This ensures
+-- SetPropagateMouseMotion/Clicks (protected functions) are
+-- called outside combat, avoiding ADDON_ACTION_BLOCKED errors.
+-- ============================================================
+
+function Engine:PreWarmIndicators(frame)
+    if not Indicators then
+        Indicators = DF.AuraDesigner.Indicators
+    end
+    if not Indicators then return end
+
+    local db = DF:GetFrameDB(frame)
+    if not db then return end
+    local adDB = db.auraDesigner
+    if not adDB then return end
+
+    -- Resolve spec
+    local spec = self:ResolveSpec(adDB)
+    if not spec then return end
+
+    local specAuras = adDB.auras and adDB.auras[spec]
+    if not specAuras then return end
+
+    -- Iterate all configured auras and their placed indicators
+    for auraName, auraCfg in pairs(specAuras) do
+        if type(auraCfg) == "table" and auraCfg.indicators then
+            for _, indicator in ipairs(auraCfg.indicators) do
+                local typeKey = indicator.type
+                if typeKey == "icon" or typeKey == "square" or typeKey == "bar" then
+                    local key = auraName .. "#" .. indicator.id
+                    Indicators:Configure(frame, typeKey, indicator, adDB.defaults, key, auraCfg.priority or 5)
+                end
+            end
+        end
+    end
+end
+
+-- ============================================================
 -- FORCE REFRESH ALL AD-ENABLED FRAMES
 -- Re-runs UpdateFrame on every visible AD frame so changed
 -- global defaults (fonts, sizes, etc.) take effect immediately.
@@ -938,6 +985,34 @@ end
 function Engine:ForceRefreshAllFrames()
     -- Bump config version so all indicators reconfigure on next UpdateFrame
     DF.adConfigVersion = (DF.adConfigVersion or 0) + 1
+
+    -- Pre-warm: create and configure all indicator frames outside combat
+    -- so SetPropagateMouseMotion/Clicks are set before combat starts
+    local function TryPreWarm(frame)
+        if frame and DF:IsAuraDesignerEnabled(frame) then
+            Engine:PreWarmIndicators(frame)
+        end
+    end
+
+    if not InCombatLockdown() then
+        if DF.IteratePartyFrames then
+            DF:IteratePartyFrames(TryPreWarm)
+        end
+        if DF.IterateRaidFrames then
+            DF:IterateRaidFrames(TryPreWarm)
+        end
+        if DF.PinnedFrames and DF.PinnedFrames.initialized and DF.PinnedFrames.headers then
+            for setIndex = 1, 2 do
+                local header = DF.PinnedFrames.headers[setIndex]
+                if header and header:IsShown() then
+                    for i = 1, 40 do
+                        local child = header:GetAttribute("child" .. i)
+                        if child then TryPreWarm(child) end
+                    end
+                end
+            end
+        end
+    end
 
     local function TryUpdate(frame)
         if frame and frame:IsVisible() and DF:IsAuraDesignerEnabled(frame) then

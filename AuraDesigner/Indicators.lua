@@ -1570,15 +1570,18 @@ function Indicators:ConfigureIcon(frame, config, defaults, auraName, priority)
     icon.dfAD_missingDesaturate = config.missingDesaturate
 
     -- Mouse handling: propagate motion/clicks to parent for tooltips and click-casting
-    -- No combat lockdown guard needed — ConfigureIcon only runs outside combat
-    if icon.SetPropagateMouseMotion then
-        icon:SetPropagateMouseMotion(true)
-    end
-    if icon.SetPropagateMouseClicks then
-        icon:SetPropagateMouseClicks(true)
-    end
-    if icon.SetMouseClickEnabled then
-        icon:SetMouseClickEnabled(false)
+    -- Guarded because SetPropagateMouseMotion/Clicks are protected in combat.
+    -- Pre-warm ensures this runs outside combat for all configured indicators.
+    if not InCombatLockdown() then
+        if icon.SetPropagateMouseMotion then
+            icon:SetPropagateMouseMotion(true)
+        end
+        if icon.SetPropagateMouseClicks then
+            icon:SetPropagateMouseClicks(true)
+        end
+        if icon.SetMouseClickEnabled then
+            icon:SetMouseClickEnabled(false)
+        end
     end
 
     -- Stamp config version so we know when to re-configure
@@ -2206,15 +2209,17 @@ function Indicators:ConfigureSquare(frame, config, defaults, auraName, priority)
     sq.dfAD_missingDesaturate = config.missingDesaturate
 
     -- Mouse handling: propagate motion/clicks to parent for tooltips and click-casting
-    -- No combat lockdown guard needed — ConfigureSquare only runs outside combat
-    if sq.SetPropagateMouseMotion then
-        sq:SetPropagateMouseMotion(true)
-    end
-    if sq.SetPropagateMouseClicks then
-        sq:SetPropagateMouseClicks(true)
-    end
-    if sq.SetMouseClickEnabled then
-        sq:SetMouseClickEnabled(false)
+    -- Mouse handling: guarded because SetPropagateMouseMotion/Clicks are protected in combat
+    if not InCombatLockdown() then
+        if sq.SetPropagateMouseMotion then
+            sq:SetPropagateMouseMotion(true)
+        end
+        if sq.SetPropagateMouseClicks then
+            sq:SetPropagateMouseClicks(true)
+        end
+        if sq.SetMouseClickEnabled then
+            sq:SetMouseClickEnabled(false)
+        end
     end
 
     -- Stamp config version so we know when to re-configure
@@ -3043,15 +3048,17 @@ function Indicators:ConfigureBar(frame, config, defaults, auraName, priority)
     end
 
     -- Mouse handling: propagate motion/clicks to parent for tooltips and click-casting
-    -- No combat lockdown guard needed — ConfigureBar only runs outside combat
-    if bar.SetPropagateMouseMotion then
-        bar:SetPropagateMouseMotion(true)
-    end
-    if bar.SetPropagateMouseClicks then
-        bar:SetPropagateMouseClicks(true)
-    end
-    if bar.SetMouseClickEnabled then
-        bar:SetMouseClickEnabled(false)
+    -- Mouse handling: guarded because SetPropagateMouseMotion/Clicks are protected in combat
+    if not InCombatLockdown() then
+        if bar.SetPropagateMouseMotion then
+            bar:SetPropagateMouseMotion(true)
+        end
+        if bar.SetPropagateMouseClicks then
+            bar:SetPropagateMouseClicks(true)
+        end
+        if bar.SetMouseClickEnabled then
+            bar:SetMouseClickEnabled(false)
+        end
     end
 
     -- Stamp config version so we know when to re-configure

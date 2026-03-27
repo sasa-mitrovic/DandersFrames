@@ -4536,6 +4536,19 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
         if DF.UpdateAllAuras then
             DF:UpdateAllAuras()
         end
+        -- Re-configure any AD indicators that were created during combat
+        -- (SetPropagateMouseMotion/Clicks are protected and can't be called in combat)
+        if DF.AuraDesigner and DF.AuraDesigner.Engine then
+            DF.adConfigVersion = (DF.adConfigVersion or 0) + 1
+            local adEngine = DF.AuraDesigner.Engine
+            local function preWarmFrame(frame)
+                if frame and DF:IsAuraDesignerEnabled(frame) then
+                    adEngine:PreWarmIndicators(frame)
+                end
+            end
+            if DF.IteratePartyFrames then DF:IteratePartyFrames(preWarmFrame) end
+            if DF.IterateRaidFrames then DF:IterateRaidFrames(preWarmFrame) end
+        end
         -- Re-apply mouse settings on aura icons created during combat
         if DF.auraIconsNeedMouseFix then
             DF.auraIconsNeedMouseFix = false
