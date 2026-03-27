@@ -1,5 +1,20 @@
 # DandersFrames Changelog
 
+## [4.1.9] - 2026-03-27
+
+### New Features
+* (Boss Debuffs) **Frame Border Overlay** — adds a border around the entire unit frame when private aura boss debuffs are active. Includes settings for border scale, icon ratio, frame level, max slots, and clip-to-frame. An auto-fit button calculates optimal border size from your frame dimensions
+* (Boss Debuffs) **Overlay Setup Wizard** — guided setup that explains the overlay feature and lets users enable/disable it with image previews. Runs automatically for existing users on first login, or manually via the Boss Debuffs settings tab
+* (Boss Debuffs) **Hide Tooltip** option — shrinks the private aura parent frame to sub-pixel size so hovering over boss debuff icons no longer shows a tooltip, while the icon remains visible
+* (Boss Debuffs) **Test Mode Overlay Preview** — test mode now shows a coloured border approximation of the overlay so you can tune settings without being in combat
+
+### Changes
+* (Boss Debuffs) Rewrite private aura system to use a single anchor per icon instead of the dual-anchor approach — simpler, cleaner, and eliminates duplicate text and sizing issues
+* (Boss Debuffs) Remove deprecated settings: text scale/offset, click-casting toggle, debug overlay, and unused scale setting
+
+### Bug Fixes
+* (Auras) Fix Blizzard aura mode not repopulating cache when switching from Direct mode — stripped frame events are now restored on mode switch
+
 ## [4.1.8] - 2026-03-26
 
 ### New Features
