@@ -663,6 +663,22 @@ function Engine:UpdateFrame(frame)
             end
         end
 
+        -- Configure-once: only reconfigure when AD settings have changed
+        if ind.typeKey == "icon" or ind.typeKey == "square" or ind.typeKey == "bar" then
+            local indicatorFrame = nil
+            if ind.typeKey == "icon" then
+                indicatorFrame = frame.dfAD_icons and frame.dfAD_icons[key]
+            elseif ind.typeKey == "square" then
+                indicatorFrame = frame.dfAD_squares and frame.dfAD_squares[key]
+            elseif ind.typeKey == "bar" then
+                indicatorFrame = frame.dfAD_bars and frame.dfAD_bars[key]
+            end
+            -- Configure if frame doesn't exist yet (first time) or version is stale
+            if not indicatorFrame or indicatorFrame.dfAD_configVersion ~= (DF.adConfigVersion or 0) then
+                Indicators:Configure(frame, ind.typeKey, config, adDB.defaults, key, ind.priority)
+            end
+        end
+
         Indicators:Apply(frame, ind.typeKey, config, ind.auraData, adDB.defaults, key, ind.priority)
     end
 

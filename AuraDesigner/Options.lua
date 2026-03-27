@@ -1710,7 +1710,8 @@ local function RefreshPlacedIndicators()
                         expirationTime = GetTime() + 10,
                         stacks = 3,
                     }
-                    Indicators:ApplyIcon(mockFrame, effectiveConfig, mockAuraData, adDB.defaults, instanceKey)
+                    Indicators:ConfigureIcon(mockFrame, effectiveConfig, adDB.defaults, instanceKey)
+                    Indicators:UpdateIcon(mockFrame, effectiveConfig, mockAuraData, adDB.defaults, instanceKey)
 
                     local iconMap = mockFrame.dfAD_icons
                     local icon = iconMap and iconMap[instanceKey]
@@ -1753,7 +1754,8 @@ local function RefreshPlacedIndicators()
                         expirationTime = GetTime() + 10,
                         stacks = 3,
                     }
-                    Indicators:ApplySquare(mockFrame, effectiveConfig, mockAuraData, adDB.defaults, instanceKey)
+                    Indicators:ConfigureSquare(mockFrame, effectiveConfig, adDB.defaults, instanceKey)
+                    Indicators:UpdateSquare(mockFrame, effectiveConfig, mockAuraData, adDB.defaults, instanceKey)
 
                     local sqMap = mockFrame.dfAD_squares
                     local sq = sqMap and sqMap[instanceKey]
@@ -1792,7 +1794,8 @@ local function RefreshPlacedIndicators()
                         expirationTime = GetTime() + 10,
                         stacks = 0,
                     }
-                    Indicators:ApplyBar(mockFrame, effectiveConfig, mockAuraData, adDB.defaults, instanceKey)
+                    Indicators:ConfigureBar(mockFrame, effectiveConfig, adDB.defaults, instanceKey)
+                    Indicators:UpdateBar(mockFrame, effectiveConfig, mockAuraData, adDB.defaults, instanceKey)
 
                     local barMap = mockFrame.dfAD_bars
                     local bar = barMap and barMap[instanceKey]
@@ -2051,8 +2054,9 @@ RefreshPreviewLightweight = function()
                             duration = 15, expirationTime = GetTime() + 10,
                             stacks = 3,
                         }
-                        Indicators:ApplyIcon(mockFrame, effectiveConfig, mockAuraData, adDB.defaults, instanceKey)
-                        -- Re-enable mouse (ApplyIcon disables it for real unit frames)
+                        Indicators:ConfigureIcon(mockFrame, effectiveConfig, adDB.defaults, instanceKey)
+                        Indicators:UpdateIcon(mockFrame, effectiveConfig, mockAuraData, adDB.defaults, instanceKey)
+                        -- Re-enable mouse (ConfigureIcon disables it for real unit frames)
                         icon:EnableMouse(true)
                         if icon.SetMouseClickEnabled then icon:SetMouseClickEnabled(true) end
                     end
@@ -2065,7 +2069,8 @@ RefreshPreviewLightweight = function()
                             duration = 15, expirationTime = GetTime() + 10,
                             stacks = 3,
                         }
-                        Indicators:ApplySquare(mockFrame, effectiveConfig, mockAuraData, adDB.defaults, instanceKey)
+                        Indicators:ConfigureSquare(mockFrame, effectiveConfig, adDB.defaults, instanceKey)
+                        Indicators:UpdateSquare(mockFrame, effectiveConfig, mockAuraData, adDB.defaults, instanceKey)
                         sq:EnableMouse(true)
                     end
                 elseif indicator.type == "bar" then
@@ -2077,8 +2082,9 @@ RefreshPreviewLightweight = function()
                             duration = 15, expirationTime = GetTime() + 10,
                             stacks = 0,
                         }
-                        Indicators:ApplyBar(mockFrame, effectiveConfig, mockAuraData, adDB.defaults, instanceKey)
-                        -- Re-enable mouse (ApplyBar disables it for real unit frames)
+                        Indicators:ConfigureBar(mockFrame, effectiveConfig, adDB.defaults, instanceKey)
+                        Indicators:UpdateBar(mockFrame, effectiveConfig, mockAuraData, adDB.defaults, instanceKey)
+                        -- Re-enable mouse (ConfigureBar disables it for real unit frames)
                         bar:EnableMouse(true)
                         if bar.SetMouseClickEnabled then bar:SetMouseClickEnabled(true) end
                     end

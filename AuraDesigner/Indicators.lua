@@ -182,7 +182,7 @@ local function RegisterExpiring(element, entryData)
     -- Evaluate immediately so the Apply function ends with the correct
     -- color.  Without this the Apply sets the *original* color, then the
     -- ticker (3 FPS) overrides it later → visible flicker.
-    -- Same approach as bar's "Set initial bar color" block in ApplyBar.
+    -- Same approach as bar's "Set initial bar color" block in ConfigureBar.
     local applied = false
     if entryData.colorCurve and entryData.unit and entryData.auraInstanceID
        and C_UnitAuras and C_UnitAuras.GetAuraDuration then
@@ -509,6 +509,23 @@ function Indicators:BeginFrame(frame)
 end
 
 -- ============================================================
+-- CONFIGURE DISPATCH
+-- Routes to type-specific Configure functions for pooled indicator types.
+-- Called only when dfAD_configVersion is stale.
+-- ============================================================
+function Indicators:Configure(frame, typeKey, config, defaults, auraName, priority)
+    if typeKey == "icon" then
+        self:ConfigureIcon(frame, config, defaults, auraName, priority)
+    elseif typeKey == "square" then
+        self:ConfigureSquare(frame, config, defaults, auraName, priority)
+    elseif typeKey == "bar" then
+        self:ConfigureBar(frame, config, defaults, auraName, priority)
+    end
+    -- border, healthbar, nametext, healthtext, framealpha don't need configure-once
+    -- (they modify the unit frame itself, not pooled indicator frames)
+end
+
+-- ============================================================
 -- APPLY -- DISPATCH TO TYPE HANDLERS
 -- ============================================================
 
@@ -565,11 +582,11 @@ function Indicators:Apply(frame, typeKey, config, auraData, defaults, auraName, 
     elseif typeKey == "framealpha" then
         self:ApplyFrameAlpha(frame, config, auraData)
     elseif typeKey == "icon" then
-        self:ApplyIcon(frame, config, auraData, defaults, auraName, priority)
+        self:UpdateIcon(frame, config, auraData, defaults, auraName, priority)
     elseif typeKey == "square" then
-        self:ApplySquare(frame, config, auraData, defaults, auraName, priority)
+        self:UpdateSquare(frame, config, auraData, defaults, auraName, priority)
     elseif typeKey == "bar" then
-        self:ApplyBar(frame, config, auraData, defaults, auraName, priority)
+        self:UpdateBar(frame, config, auraData, defaults, auraName, priority)
     end
 
     pendingHideWhenNotExpiring = false  -- Reset
@@ -620,11 +637,14 @@ function Indicators:ApplyTest(frame, typeKey, config, auraData, defaults, auraNa
     elseif typeKey == "framealpha" then
         self:ApplyFrameAlpha(frame, config, auraData)
     elseif typeKey == "icon" then
-        self:ApplyIcon(frame, config, auraData, defaults, auraName, priority)
+        self:ConfigureIcon(frame, config, defaults, auraName, priority)
+        self:UpdateIcon(frame, config, auraData, defaults, auraName, priority)
     elseif typeKey == "square" then
-        self:ApplySquare(frame, config, auraData, defaults, auraName, priority)
+        self:ConfigureSquare(frame, config, defaults, auraName, priority)
+        self:UpdateSquare(frame, config, auraData, defaults, auraName, priority)
     elseif typeKey == "bar" then
-        self:ApplyBar(frame, config, auraData, defaults, auraName, priority)
+        self:ConfigureBar(frame, config, defaults, auraName, priority)
+        self:UpdateBar(frame, config, auraData, defaults, auraName, priority)
     end
 end
 
