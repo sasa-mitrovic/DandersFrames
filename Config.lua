@@ -838,6 +838,8 @@ DF.PartyDefaults = {
     bossDebuffsOverlayFrameLevel = 14,
     bossDebuffsOverlayIconRatio = 2.6,
     bossDebuffsOverlayMaxSlots = 3,
+    bossDebuffsTestWidthMult = 0.085,
+    bossDebuffsTestHeightMult = 0.055,
     bossDebuffsOverlayScale = 1.05,
 
     -- Buff settings
@@ -2051,6 +2053,8 @@ DF.RaidDefaults = {
     bossDebuffsOverlayFrameLevel = 14,
     bossDebuffsOverlayIconRatio = 2.6,
     bossDebuffsOverlayMaxSlots = 3,
+    bossDebuffsTestWidthMult = 0.085,
+    bossDebuffsTestHeightMult = 0.055,
     bossDebuffsOverlayScale = 1.05,
 
     -- Buff settings
