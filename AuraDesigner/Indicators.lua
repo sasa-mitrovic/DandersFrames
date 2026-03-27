@@ -2520,7 +2520,7 @@ end
 local DEFAULT_BAR_TEXTURE = "Interface\\TargetingFrame\\UI-StatusBar"
 
 -- Cached color curves for bar color-by-time (same approach as Auras.lua expiring system)
--- Bar color curves are now pre-built per-bar in ApplyBar (stored as bar.dfAD_colorCurve)
+-- Bar color curves are now pre-built per-bar in ConfigureBar (stored as bar.dfAD_colorCurve)
 
 local function CreateADBar(frame, auraName)
     local bar = CreateFrame("StatusBar", nil, frame.contentOverlay or frame)
@@ -2642,7 +2642,7 @@ local function CreateADBar(frame, auraName)
         self.dfAD_colorElapsed = 0
 
         -- API path: evaluate pre-built color curve (no secret comparisons)
-        -- The curve is built in ApplyBar and encodes gradient + expiring logic
+        -- The curve is built in ConfigureBar and encodes gradient + expiring logic
         if self.dfAD_colorCurve then
             local unit = self.dfAD_unit
             local auraInstanceID = self.dfAD_auraInstanceID
@@ -2719,10 +2719,13 @@ local function GetOrCreateADBar(frame, auraName)
     return bar
 end
 
-function Indicators:ApplyBar(frame, config, auraData, defaults, auraName, priority)
-    local state = EnsureFrameState(frame)
-    state.activeBars[auraName] = true
-
+-- ============================================================
+-- ConfigureBar: static config applied once per config change
+-- Sets size, orientation, texture, colors, color curve, border,
+-- frame level/strata, duration font & style, expiring config
+-- flags, and mouse propagation.  Mirrors ConfigureIcon/ConfigureSquare.
+-- ============================================================
+function Indicators:ConfigureBar(frame, config, defaults, auraName, priority)
     local bar = GetOrCreateADBar(frame, auraName)
 
     -- ========================================
@@ -2745,6 +2748,12 @@ function Indicators:ApplyBar(frame, config, auraData, defaults, auraName, priori
     local orientation = config.orientation or "HORIZONTAL"
     bar:SetOrientation(orientation)
 
+    -- Fill direction
+    local reverseFill = config.reverseFill
+    if reverseFill ~= nil and bar.SetReverseFill then
+        bar:SetReverseFill(reverseFill)
+    end
+
     -- ========================================
     -- TEXTURE
     -- ========================================
@@ -2755,7 +2764,7 @@ function Indicators:ApplyBar(frame, config, auraData, defaults, auraName, priori
     end
 
     -- ========================================
-    -- COLORS
+    -- COLORS (stored for OnUpdate to read)
     -- ========================================
     local fillColor = config.fillColor
     local fillR = fillColor and (fillColor[1] or fillColor.r) or 1
@@ -2780,14 +2789,14 @@ function Indicators:ApplyBar(frame, config, auraData, defaults, auraName, priori
     bar.dfAD_expiringThresholdMode = config.expiringThresholdMode
     bar.dfAD_expiringColor = config.expiringColor or { r = 1, g = 0.2, b = 0.2 }
 
-    -- Store unit + auraInstanceID for API-based color evaluation
-    bar.dfAD_unit = frame.unit
-    bar.dfAD_auraInstanceID = auraData.auraInstanceID
-
     -- Store base fill color for OnUpdate fallback
     bar.dfAD_fillR = fillR
     bar.dfAD_fillG = fillG
     bar.dfAD_fillB = fillB
+
+    -- Hide Icon flag (bars don't have icons but stored for consistency)
+    local hideIcon = config.hideIcon; if hideIcon == nil then hideIcon = defaults and defaults.hideIcon end
+    bar.dfAD_hideIcon = hideIcon
 
     -- ========================================
     -- COLOR CURVE (pre-built for OnUpdate)
@@ -2872,32 +2881,6 @@ function Indicators:ApplyBar(frame, config, auraData, defaults, auraName, priori
         bar.dfAD_colorCurve = nil
     end
 
-    -- Set initial bar color
-    -- When a color curve exists, evaluate it immediately to avoid flicker
-    -- (ApplyBar runs on every aura update; without this, the fill color
-    -- would flash briefly until the throttled OnUpdate re-evaluates the curve)
-    if bar.dfAD_colorCurve and frame.unit and auraData.auraInstanceID
-       and C_UnitAuras and C_UnitAuras.GetAuraDuration then
-        local durationObj = C_UnitAuras.GetAuraDuration(frame.unit, auraData.auraInstanceID)
-        if durationObj then
-            local result
-            if bar.dfAD_colorCurveUsesSeconds and durationObj.EvaluateRemainingDuration then
-                result = durationObj:EvaluateRemainingDuration(bar.dfAD_colorCurve)
-            elseif durationObj.EvaluateRemainingPercent then
-                result = durationObj:EvaluateRemainingPercent(bar.dfAD_colorCurve)
-            end
-            if result and result.r then
-                bar:SetStatusBarColor(result.r, result.g, result.b)
-            else
-                bar:SetStatusBarColor(fillR, fillG, fillB, 1)
-            end
-        else
-            bar:SetStatusBarColor(fillR, fillG, fillB, 1)
-        end
-    else
-        bar:SetStatusBarColor(fillR, fillG, fillB, 1)
-    end
-
     -- ========================================
     -- BORDER
     -- ========================================
@@ -2928,19 +2911,6 @@ function Indicators:ApplyBar(frame, config, auraData, defaults, auraName, priori
         end
     end
 
-    -- ========================================
-    -- POSITION
-    -- ========================================
-    local anchor = config.anchor or "BOTTOM"
-    local offsetX = config.offsetX or 0
-    local offsetY = config.offsetY or 0
-    -- Compensate for border overhang at frame edges
-    local showBorderForPos = config.showBorder
-    if showBorderForPos == nil then showBorderForPos = true end
-    offsetX, offsetY = AdjustOffsetForBorder(anchor, offsetX, offsetY, config.borderThickness or 1, showBorderForPos)
-    bar:ClearAllPoints()
-    bar:SetPoint(anchor, frame, anchor, offsetX, offsetY)
-
     -- Frame level: base from frame (not contentOverlay) + per-indicator level + small priority tiebreaker
     local level = config.frameLevel or (defaults and defaults.indicatorFrameLevel) or 2
     local baseLevel = frame:GetFrameLevel()
@@ -2954,6 +2924,147 @@ function Indicators:ApplyBar(frame, config, auraData, defaults, auraName, priori
     else
         bar:SetFrameStrata(frame:GetFrameStrata())
     end
+
+    -- ========================================
+    -- DURATION TEXT — font/style/flags configuration
+    -- ========================================
+    local showDuration = config.showDuration
+    if showDuration == nil then showDuration = false end
+    local durationFont = config.durationFont or (defaults and defaults.durationFont) or "Fonts\\FRIZQT__.TTF"
+    local durationScale = config.durationScale or (defaults and defaults.durationScale) or 1.0
+    local durationOutline = config.durationOutline or (defaults and defaults.durationOutline) or "OUTLINE"
+    if durationOutline == "NONE" then durationOutline = "" end
+    local durationAnchor = config.durationAnchor or (defaults and defaults.durationAnchor) or "CENTER"
+    local durationX = config.durationX; if durationX == nil then durationX = defaults and defaults.durationX end; if durationX == nil then durationX = 0 end
+    local durationY = config.durationY; if durationY == nil then durationY = defaults and defaults.durationY end; if durationY == nil then durationY = 0 end
+    local durationColorByTime = config.durationColorByTime
+    if durationColorByTime == nil then
+        durationColorByTime = (defaults and defaults.durationColorByTime)
+        if durationColorByTime == nil then durationColorByTime = true end
+    end
+
+    local durationHideAboveEnabled = config.durationHideAboveEnabled
+    if durationHideAboveEnabled == nil then durationHideAboveEnabled = (defaults and defaults.durationHideAboveEnabled) or false end
+    local durationHideAboveThreshold = config.durationHideAboveThreshold or (defaults and defaults.durationHideAboveThreshold) or 10
+
+    -- Store duration config on bar for UpdateBar and OnUpdate to read
+    bar.dfAD_showDuration = showDuration
+    bar.dfAD_durationColorByTime = durationColorByTime
+    bar.dfAD_durationAnchor = durationAnchor
+    bar.dfAD_durationX = durationX
+    bar.dfAD_durationY = durationY
+    bar.dfAD_durationHideAboveEnabled = durationHideAboveEnabled
+    bar.dfAD_durationHideAboveThreshold = durationHideAboveThreshold
+    bar.dfAD_durationFont = durationFont
+    bar.dfAD_durationScale = durationScale
+    bar.dfAD_durationOutline = durationOutline
+
+    -- Find native cooldown text if not yet cached
+    if not bar.nativeCooldownText and bar.durationCooldown then
+        local regions = { bar.durationCooldown:GetRegions() }
+        for _, region in pairs(regions) do
+            if region and region.GetObjectType and region:GetObjectType() == "FontString" then
+                bar.nativeCooldownText = region
+                bar.nativeTextReparented = false
+                break
+            end
+        end
+    end
+
+    -- Create duration hide wrapper + reparent native text + style + position
+    if bar.nativeCooldownText then
+        if showDuration then
+            if not bar.durationHideWrapper and bar.textOverlay then
+                bar.durationHideWrapper = CreateFrame("Frame", nil, bar.textOverlay)
+                bar.durationHideWrapper:SetAllPoints(bar.textOverlay)
+                bar.durationHideWrapper:SetFrameLevel(bar.textOverlay:GetFrameLevel())
+                bar.durationHideWrapper:EnableMouse(false)
+            end
+            if not bar.nativeTextReparented and bar.durationHideWrapper then
+                bar.nativeCooldownText:SetParent(bar.durationHideWrapper)
+                bar.nativeTextReparented = true
+            end
+            local durationSize = 10 * durationScale
+            DF:SafeSetFont(bar.nativeCooldownText, durationFont, durationSize, durationOutline)
+            bar.nativeCooldownText:ClearAllPoints()
+            bar.nativeCooldownText:SetPoint(durationAnchor, bar, durationAnchor, durationX, durationY)
+            bar.nativeCooldownText:Show()
+        else
+            bar.nativeCooldownText:Hide()
+        end
+    end
+
+    -- Style manual duration FontString (preview path)
+    if bar.duration then
+        local durationSize = 10 * durationScale
+        DF:SafeSetFont(bar.duration, durationFont, durationSize, durationOutline)
+        bar.duration:ClearAllPoints()
+        bar.duration:SetPoint(durationAnchor, bar, durationAnchor, durationX, durationY)
+    end
+
+    -- ========================================
+    -- EXPIRING — animation setup + config flags
+    -- ========================================
+    -- Whole-alpha pulse: animates the entire bar frame's alpha
+    local expiringWholeAlphaPulse = config.expiringWholeAlphaPulse or false
+    if expiringWholeAlphaPulse then GetOrCreateWholeAlphaPulse(bar) end
+    bar.dfAD_expiringWholeAlphaPulse = expiringWholeAlphaPulse
+    if not expiringWholeAlphaPulse and bar.dfAD_wholeAlphaPulse and bar.dfAD_wholeAlphaPulse:IsPlaying() then
+        bar.dfAD_wholeAlphaPulse:Stop()
+        bar:SetAlpha(1)
+    end
+
+    -- Bounce: Translation animation directly on the bar
+    local expiringBounce = config.expiringBounce or false
+    if expiringBounce then GetOrCreateBounceAnim(bar) end
+    bar.dfAD_expiringBounce = expiringBounce
+    if not expiringBounce and bar.dfAD_bounceAnim and bar.dfAD_bounceAnim:IsPlaying() then
+        bar.dfAD_bounceAnim:Stop()
+    end
+
+    -- Mouse handling: propagate motion/clicks to parent for tooltips and click-casting
+    -- No combat lockdown guard needed — ConfigureBar only runs outside combat
+    if bar.SetPropagateMouseMotion then
+        bar:SetPropagateMouseMotion(true)
+    end
+    if bar.SetPropagateMouseClicks then
+        bar:SetPropagateMouseClicks(true)
+    end
+    if bar.SetMouseClickEnabled then
+        bar:SetMouseClickEnabled(false)
+    end
+
+    -- Stamp config version so we know when to re-configure
+    bar.dfAD_configVersion = DF.adConfigVersion or 0
+end
+
+-- ============================================================
+-- UpdateBar: dynamic aura-data-driven properties (called every UNIT_AURA)
+-- Sets position, fill, initial color, duration text + cooldown,
+-- hide-above alpha, and shows the bar.  Mirrors UpdateIcon/UpdateSquare.
+-- ============================================================
+function Indicators:UpdateBar(frame, config, auraData, defaults, auraName, priority)
+    local state = EnsureFrameState(frame)
+    state.activeBars[auraName] = true
+
+    local bar = GetOrCreateADBar(frame, auraName)
+
+    -- Store unit + auraInstanceID for API-based color evaluation in OnUpdate
+    bar.dfAD_unit = frame.unit
+    bar.dfAD_auraInstanceID = auraData.auraInstanceID
+
+    -- ========================================
+    -- POSITION (dynamic because layout groups compute offsets per-event)
+    -- ========================================
+    local anchor = config.anchor or "BOTTOM"
+    local offsetX = config.offsetX or 0
+    local offsetY = config.offsetY or 0
+    -- Compensate for border overhang at frame edges
+    local showBorderForPos = config.showBorder
+    if showBorderForPos == nil then showBorderForPos = true end
+    offsetX, offsetY = AdjustOffsetForBorder(anchor, offsetX, offsetY, config.borderThickness or 1, showBorderForPos)
+    bar:ClearAllPoints()
+    bar:SetPoint(anchor, frame, anchor, offsetX, offsetY)
 
     -- ========================================
     -- COUNTDOWN DATA (drives bar fill)
@@ -2998,34 +3109,51 @@ function Indicators:ApplyBar(frame, config, auraData, defaults, auraName, priori
     bar.dfAD_usedTimerDuration = usedTimerDuration
 
     -- ========================================
-    -- DURATION TEXT
+    -- INITIAL BAR COLOR
+    -- When a color curve exists, evaluate it immediately to avoid flicker
+    -- (UpdateBar runs on every aura update; without this, the fill color
+    -- would flash briefly until the throttled OnUpdate re-evaluates the curve)
     -- ========================================
-    local showDuration = config.showDuration
-    if showDuration == nil then showDuration = false end
-    local durationFont = config.durationFont or (defaults and defaults.durationFont) or "Fonts\\FRIZQT__.TTF"
-    local durationScale = config.durationScale or (defaults and defaults.durationScale) or 1.0
-    local durationOutline = config.durationOutline or (defaults and defaults.durationOutline) or "OUTLINE"
-    if durationOutline == "NONE" then durationOutline = "" end
-    local durationAnchor = config.durationAnchor or (defaults and defaults.durationAnchor) or "CENTER"
-    local durationX = config.durationX; if durationX == nil then durationX = defaults and defaults.durationX end; if durationX == nil then durationX = 0 end
-    local durationY = config.durationY; if durationY == nil then durationY = defaults and defaults.durationY end; if durationY == nil then durationY = 0 end
-    local durationColorByTime = config.durationColorByTime
-    if durationColorByTime == nil then
-        durationColorByTime = (defaults and defaults.durationColorByTime)
-        if durationColorByTime == nil then durationColorByTime = true end
+    local fillR = bar.dfAD_fillR or 1
+    local fillG = bar.dfAD_fillG or 1
+    local fillB = bar.dfAD_fillB or 1
+
+    if bar.dfAD_colorCurve and frame.unit and auraData.auraInstanceID
+       and C_UnitAuras and C_UnitAuras.GetAuraDuration then
+        local durationObj = C_UnitAuras.GetAuraDuration(frame.unit, auraData.auraInstanceID)
+        if durationObj then
+            local result
+            if bar.dfAD_colorCurveUsesSeconds and durationObj.EvaluateRemainingDuration then
+                result = durationObj:EvaluateRemainingDuration(bar.dfAD_colorCurve)
+            elseif durationObj.EvaluateRemainingPercent then
+                result = durationObj:EvaluateRemainingPercent(bar.dfAD_colorCurve)
+            end
+            if result and result.r then
+                bar:SetStatusBarColor(result.r, result.g, result.b)
+            else
+                bar:SetStatusBarColor(fillR, fillG, fillB, 1)
+            end
+        else
+            bar:SetStatusBarColor(fillR, fillG, fillB, 1)
+        end
+    else
+        bar:SetStatusBarColor(fillR, fillG, fillB, 1)
     end
 
-    local durationHideAboveEnabled = config.durationHideAboveEnabled
-    if durationHideAboveEnabled == nil then durationHideAboveEnabled = (defaults and defaults.durationHideAboveEnabled) or false end
-    local durationHideAboveThreshold = config.durationHideAboveThreshold or (defaults and defaults.durationHideAboveThreshold) or 10
-
-    -- Store flags for OnUpdate to read
-    bar.dfAD_durationColorByTime = durationColorByTime
-    bar.dfAD_durationHideAboveEnabled = durationHideAboveEnabled
-    bar.dfAD_durationHideAboveThreshold = durationHideAboveThreshold
+    -- ========================================
+    -- DURATION TEXT
+    -- ========================================
+    local showDuration = bar.dfAD_showDuration
+    local durationColorByTime = bar.dfAD_durationColorByTime
+    local durationHideAboveEnabled = bar.dfAD_durationHideAboveEnabled
+    local durationHideAboveThreshold = bar.dfAD_durationHideAboveThreshold
+    local durationAnchor = bar.dfAD_durationAnchor or "CENTER"
+    local durationX = bar.dfAD_durationX or 0
+    local durationY = bar.dfAD_durationY or 0
 
     if showDuration and hasDuration then
-        local durationSize = 10 * durationScale
+        local durationSize = 10 * (bar.dfAD_durationScale or 1.0)
+        local durationFont = bar.dfAD_durationFont or "Fonts\\FRIZQT__.TTF"
 
         -- Compute hide-above alpha (initial evaluation)
         local hideAlpha = 1
@@ -3067,36 +3195,8 @@ function Indicators:ApplyBar(frame, config, auraData, defaults, auraName, priori
                 bar.durationCooldown:Show()
             end
 
-            -- Find native cooldown text if not yet cached
-            if not bar.nativeCooldownText then
-                local regions = { bar.durationCooldown:GetRegions() }
-                for _, region in pairs(regions) do
-                    if region and region.GetObjectType and region:GetObjectType() == "FontString" then
-                        bar.nativeCooldownText = region
-                        bar.nativeTextReparented = false
-                        break
-                    end
-                end
-            end
-
             -- Style and position the native countdown text
             if bar.nativeCooldownText then
-                -- Create wrapper frame for parent-level alpha control
-                if not bar.durationHideWrapper and bar.textOverlay then
-                    bar.durationHideWrapper = CreateFrame("Frame", nil, bar.textOverlay)
-                    bar.durationHideWrapper:SetAllPoints(bar.textOverlay)
-                    bar.durationHideWrapper:SetFrameLevel(bar.textOverlay:GetFrameLevel())
-                    bar.durationHideWrapper:EnableMouse(false)
-                end
-                if not bar.nativeTextReparented and bar.durationHideWrapper then
-                    bar.nativeCooldownText:SetParent(bar.durationHideWrapper)
-                    bar.nativeTextReparented = true
-                end
-                DF:SafeSetFont(bar.nativeCooldownText, durationFont, durationSize, durationOutline)
-                bar.nativeCooldownText:ClearAllPoints()
-                bar.nativeCooldownText:SetPoint(durationAnchor, bar, durationAnchor, durationX, durationY)
-                bar.nativeCooldownText:Show()
-
                 -- Apply hide-above alpha on the wrapper frame (immune to Blizzard resets)
                 if bar.durationHideWrapper then
                     bar.durationHideWrapper:SetAlpha(hideAlpha)
@@ -3120,6 +3220,9 @@ function Indicators:ApplyBar(frame, config, auraData, defaults, auraName, priori
                 end
 
                 -- Register wrapper for ongoing hide-above alpha updates
+                -- Temporarily suppress hideWhenNotExpiring so the wrapper doesn't get it
+                local savedHWNE = pendingHideWhenNotExpiring
+                pendingHideWhenNotExpiring = false
                 if durationHideAboveEnabled and bar.durationHideWrapper then
                     local hideCurve = BuildDurationHideCurve(durationHideAboveThreshold)
                     if hideCurve then
@@ -3146,6 +3249,7 @@ function Indicators:ApplyBar(frame, config, auraData, defaults, auraName, priori
                         bar.durationHideWrapper:SetAlpha(1)
                     end
                 end
+                pendingHideWhenNotExpiring = savedHWNE  -- Restore for main registration
             end
 
         elseif bar.duration then
@@ -3160,10 +3264,6 @@ function Indicators:ApplyBar(frame, config, auraData, defaults, auraName, priori
                 UnregisterExpiring(bar.durationHideWrapper)
                 bar.durationHideWrapper:SetAlpha(1)
             end
-
-            DF:SafeSetFont(bar.duration, durationFont, durationSize, durationOutline)
-            bar.duration:ClearAllPoints()
-            bar.duration:SetPoint(durationAnchor, bar, durationAnchor, durationX, durationY)
 
             local dur = auraData.duration
             local exp = auraData.expirationTime
@@ -3192,11 +3292,6 @@ function Indicators:ApplyBar(frame, config, auraData, defaults, auraName, priori
             UnregisterExpiring(bar.durationHideWrapper)
             bar.durationHideWrapper:SetAlpha(1)
         end
-    end
-
-    -- Ensure mouse doesn't block clicks on the unit frame
-    if not InCombatLockdown() and bar.SetMouseClickEnabled then
-        bar:SetMouseClickEnabled(false)
     end
 
     bar:Show()
