@@ -4847,6 +4847,20 @@ function DF:FullProfileRefresh()
         DF:RebuildDirectFilterStrings()
     end
 
+    -- Re-initialize aura source mode for the new profile
+    -- Without this, switching to a profile using Direct API shows no auras
+    -- because the cache (DF.BlizzardAuraCache) is never populated
+    if DF.EnableDirectAuraMode then
+        local partyMode = DF.db.party and DF.db.party.auraSourceMode
+        local raidMode = DF.db.raid and DF.db.raid.auraSourceMode
+        local needsDirect = (partyMode == "DIRECT") or (raidMode == "DIRECT")
+        if needsDirect then
+            DF:EnableDirectAuraMode()
+        elseif DF.DisableDirectAuraMode then
+            DF:DisableDirectAuraMode()
+        end
+    end
+
     -- Clear color curves (colors may have changed)
     if DF.UpdateColorCurve then
         DF:UpdateColorCurve()
