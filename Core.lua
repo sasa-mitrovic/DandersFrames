@@ -3182,6 +3182,7 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
                 },
                 wizardConfigs = {},
                 seenAuraSetupWizard = true,  -- New users don't need the wizard
+                seenOverlaySetupWizard = true,  -- New users don't need the overlay wizard
             }
         end
         
@@ -4401,6 +4402,24 @@ eventFrame:SetScript("OnEvent", function(self, event, arg1)
                     local builtins = DF.WizardBuilder:GetBuiltinWizards()
                     for _, entry in ipairs(builtins) do
                         if entry.name == "Aura Filter Setup" and entry.build then
+                            local config = entry.build()
+                            if config then DF:ShowPopupWizard(config) end
+                            break
+                        end
+                    end
+                end
+            end)
+        end
+
+        -- Show Private Aura Overlay Setup wizard for existing users on first login after update
+        if DandersFramesDB_v2 and not DandersFramesDB_v2.seenOverlaySetupWizard then
+            DandersFramesDB_v2.seenOverlaySetupWizard = true
+            -- Delay to avoid colliding with other startup wizards
+            C_Timer.After(5, function()
+                if DF.WizardBuilder and not InCombatLockdown() and not DF:IsPopupShown() then
+                    local builtins = DF.WizardBuilder:GetBuiltinWizards()
+                    for _, entry in ipairs(builtins) do
+                        if entry.name == "Private Aura Overlay Setup" and entry.build then
                             local config = entry.build()
                             if config then DF:ShowPopupWizard(config) end
                             break

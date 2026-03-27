@@ -277,7 +277,7 @@ SetupOverlayAnchors = function(frame, unit, db)
     -- Shrink iconW by /10 and compensate with borderScale *10 to hide the icon.
     local iconW = fw * iconRatio / 10
     local iconH = 0.001
-    local bScale = 2 * 10 * overlayScale
+    local bScale = 10 * overlayScale
 
     -- Create or reuse the overlay container
     local container = frame.overlayContainer
@@ -492,7 +492,7 @@ function DF:ReanchorPrivateAuras(frame)
         local fw = frame:GetWidth()
         local iconW = fw * iconRatio / 10
         local iconH = 0.001
-        local bScale = 2 * 10 * overlayScale
+        local bScale = 10 * overlayScale
 
         for i = 1, math.min(maxSlots, #frame.overlaySubContainers) do
             local sub = frame.overlaySubContainers[i]
@@ -679,6 +679,42 @@ function DF:UpdateAllOverlayClip()
             frame.overlayContainer:SetClipsChildren(clipBorder)
         end)
     end)
+end
+
+-- ============================================================
+-- AUTO-FIT OVERLAY BORDER TO FRAME SIZE
+-- Calibrated from 125x64 frame: scale=1.65, ratio=5.80
+-- ============================================================
+
+local AUTOFIT_SCALE_CONSTANT = 0.02578   -- 10 * 1.65 / 64
+local AUTOFIT_RATIO_CONSTANT = 9.57      -- 5.80 * 1.65
+
+function DF:AutoFitOverlayBorder(mode)
+    mode = mode or (DF.GUI and DF.GUI.SelectedMode) or "party"
+    local db = DF:GetDB(mode)
+    if not db then return end
+
+    local fw = db.frameWidth or 125
+    local fh = db.frameHeight or 64
+
+    local newScale = fh * AUTOFIT_SCALE_CONSTANT
+    local newRatio = AUTOFIT_RATIO_CONSTANT / newScale
+
+    -- Clamp to slider ranges
+    newScale = math.max(0.1, math.min(5.0, newScale))
+    newRatio = math.max(0.5, math.min(10.0, newRatio))
+
+    -- Round to slider step precision
+    newScale = math.floor(newScale / 0.05 + 0.5) * 0.05
+    newRatio = math.floor(newRatio / 0.1 + 0.5) * 0.1
+
+    db.bossDebuffsOverlayScale = newScale
+    db.bossDebuffsOverlayIconRatio = newRatio
+
+    if DF.RefreshAllPrivateAuraAnchors then DF:RefreshAllPrivateAuraAnchors() end
+    if DF.UpdateAllTestBossDebuffs then DF:UpdateAllTestBossDebuffs() end
+
+    return newScale, newRatio
 end
 
 -- ============================================================

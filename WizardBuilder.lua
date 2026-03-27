@@ -2250,6 +2250,95 @@ WB:RegisterBuiltinWizard({
     end,
 })
 
+-- ============================================================
+-- BUILT-IN WIZARD: Private Aura Overlay Setup
+-- ============================================================
+
+WB:RegisterBuiltinWizard({
+    name = "Private Aura Overlay Setup",
+    description = "Guided setup for the frame border overlay that highlights boss debuffs.",
+    build = function()
+        return {
+            title = "Private Aura Overlay Setup",
+            width = 480,
+            steps = {
+                {
+                    id = "welcome",
+                    question = "New Feature: Frame Border Overlay",
+                    description = "This feature adds a glowing border around the entire unit frame when private aura boss debuffs are active.\n\n"
+                        .. "Important: The border will appear for ALL boss debuffs, not just dispellable ones. Non-dispellable debuffs show a solid border.\n\n"
+                        .. "The appearance of the border is controlled by Blizzard and cannot be customised — only the size can be adjusted.\n\n"
+                        .. "Would you like to set up this feature now?",
+                    type = "single",
+                    options = {
+                        { label = "Yes, set it up", value = "yes" },
+                        { label = "Skip for now", value = "no" },
+                    },
+                    branches = {
+                        { condition = { equals = "no" }, ["goto"] = "cancel" },
+                    },
+                    next = "enable_overlay",
+                },
+                {
+                    id = "enable_overlay",
+                    question = "Choose whether to enable the frame border overlay.",
+                    description = "The first image shows the overlay border active on a frame. The second shows the standard boss debuff icon only.",
+                    type = "imageselect",
+                    options = {
+                        {
+                            label = "Enable Overlay",
+                            value = "enable",
+                            image = "Interface\\AddOns\\DandersFrames\\Textures\\Wizards\\overlay_enabled",
+                        },
+                        {
+                            label = "Disable Overlay",
+                            value = "disable",
+                            image = "Interface\\AddOns\\DandersFrames\\Textures\\Wizards\\overlay_disabled",
+                        },
+                    },
+                    next = "summary",
+                },
+                {
+                    id = "cancel",
+                    type = "summary",
+                },
+                {
+                    id = "summary",
+                    type = "summary",
+                },
+            },
+            settingsMap = {
+                enable_overlay = {
+                    enable = {
+                        ["party.bossDebuffsOverlayEnabled"] = true,
+                        ["raid.bossDebuffsOverlayEnabled"] = true,
+                    },
+                    disable = {
+                        ["party.bossDebuffsOverlayEnabled"] = false,
+                        ["raid.bossDebuffsOverlayEnabled"] = false,
+                    },
+                },
+            },
+            onComplete = function(answers)
+                -- Auto-fit border to frame size for both modes when enabled
+                if answers.enable_overlay == "enable" then
+                    if DF.AutoFitOverlayBorder then
+                        DF:AutoFitOverlayBorder("party")
+                        DF:AutoFitOverlayBorder("raid")
+                    end
+                end
+                if DF.RefreshAllPrivateAuraAnchors then
+                    DF:RefreshAllPrivateAuraAnchors()
+                end
+                DF:Debug("Private Aura Overlay Setup wizard completed")
+            end,
+            onCancel = function()
+                DF:Debug("Private Aura Overlay Setup wizard cancelled")
+            end,
+        }
+    end,
+})
+
 -- Import wizard via slash command
 function WB:HandleImportCommand(str)
     local data, err = self:ImportWizard(str)

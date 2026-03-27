@@ -4634,6 +4634,18 @@ function DF:SetupGUIPages(GUI, CreateCategory, CreateSubTab, BuildPage)
         overlayGroup:AddWidget(GUI:CreateLabel(self.child, "Shows a border ring around the entire frame when a boss debuff is active.", 250), 35)
         overlayGroup:AddWidget(GUI:CreateCheckbox(self.child, "Enable Frame Border Overlay", db, "bossDebuffsOverlayEnabled", function()
             self:RefreshStates()
+            -- Auto-fit on first enable
+            if db.bossDebuffsOverlayEnabled and DF.AutoFitOverlayBorder then
+                local newScale, newRatio = DF:AutoFitOverlayBorder()
+                if newScale and ovScale and ovScale.slider then
+                    ovScale.slider:SetValue(newScale)
+                    if ovScale.valueText then ovScale.valueText:SetText(format("%.2f", newScale)) end
+                end
+                if newRatio and ovRatio and ovRatio.slider then
+                    ovRatio.slider:SetValue(newRatio)
+                    if ovRatio.valueText then ovRatio.valueText:SetText(format("%.1f", newRatio)) end
+                end
+            end
             if DF.RefreshAllPrivateAuraAnchors then DF:RefreshAllPrivateAuraAnchors() end
         end), 30)
         local function HideOverlayOptions(d)
@@ -4660,35 +4672,32 @@ function DF:SetupGUIPages(GUI, CreateCategory, CreateSubTab, BuildPage)
         end), 30)
         ovClip.hideOn = HideOverlayOptions
         local ovAutoFit = overlayGroup:AddWidget(GUI:CreateButton(self.child, "Auto-Fit Border to Frame Size", 210, 24, function()
-            -- Calibrated from 125x64 frame: scale=1.65, ratio=5.80
-            -- Vertical constant: bScale / fh = 10 * 1.65 / 64 = 0.2578
-            -- Horizontal constant: iconRatio * overlayScale = 5.80 * 1.65 = 9.57
-            local fw = db.frameWidth or 125
-            local fh = db.frameHeight or 64
-            local newScale = fh * 0.02578
-            local newRatio = 9.57 / newScale
-
-            -- Clamp to slider ranges
-            newScale = math.max(0.1, math.min(5.0, newScale))
-            newRatio = math.max(0.5, math.min(10.0, newRatio))
-
-            -- Round to slider step precision
-            newScale = math.floor(newScale / 0.05 + 0.5) * 0.05
-            newRatio = math.floor(newRatio / 0.1 + 0.5) * 0.1
-
-            db.bossDebuffsOverlayScale = newScale
-            db.bossDebuffsOverlayIconRatio = newRatio
-
-            -- Update slider visuals
-            if ovScale.slider then ovScale.slider:SetValue(newScale) end
-            if ovScale.valueText then ovScale.valueText:SetText(format("%.2f", newScale)) end
-            if ovRatio.slider then ovRatio.slider:SetValue(newRatio) end
-            if ovRatio.valueText then ovRatio.valueText:SetText(format("%.1f", newRatio)) end
-
-            if DF.RefreshAllPrivateAuraAnchors then DF:RefreshAllPrivateAuraAnchors() end
-            if DF.UpdateAllTestBossDebuffs then DF:UpdateAllTestBossDebuffs() end
+            if DF.AutoFitOverlayBorder then
+                local newScale, newRatio = DF:AutoFitOverlayBorder()
+                if newScale and ovScale.slider then
+                    ovScale.slider:SetValue(newScale)
+                    if ovScale.valueText then ovScale.valueText:SetText(format("%.2f", newScale)) end
+                end
+                if newRatio and ovRatio.slider then
+                    ovRatio.slider:SetValue(newRatio)
+                    if ovRatio.valueText then ovRatio.valueText:SetText(format("%.1f", newRatio)) end
+                end
+            end
         end), 30)
         ovAutoFit.hideOn = HideOverlayOptions
+        local ovWizard = overlayGroup:AddWidget(GUI:CreateButton(self.child, "Run Overlay Setup Wizard", 210, 24, function()
+            if DF.WizardBuilder then
+                local builtins = DF.WizardBuilder:GetBuiltinWizards()
+                for _, entry in ipairs(builtins) do
+                    if entry.name == "Private Aura Overlay Setup" and entry.build then
+                        local config = entry.build()
+                        if config then DF:ShowPopupWizard(config) end
+                        break
+                    end
+                end
+            end
+        end), 30)
+        ovWizard.hideOn = function(d) return not d.bossDebuffsEnabled end
         overlayGroup.hideOn = HideBossDebuffOptions
         Add(overlayGroup, nil, 2)
 
