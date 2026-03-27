@@ -73,7 +73,6 @@ Engine:UpdateFrame(frame)
 ### ConfigureIcon (static, config-driven)
 
 - `SetSize`, `SetScale`, `SetAlpha` (dfBaseAlpha)
-- `ClearAllPoints` + `SetPoint` (position, anchor, offsets with border compensation)
 - `SetFrameLevel`, `SetFrameStrata` / `SafeSetFrameStrata`
 - Border show/hide, thickness, inset
 - Texture inset + texcoord setup
@@ -87,6 +86,7 @@ Engine:UpdateFrame(frame)
 
 ### UpdateIcon (dynamic, aura-data-driven)
 
+- Position (`ClearAllPoints` + `SetPoint`) — in Update because layout groups compute dynamic offsets per-event
 - Texture (`SafeSetTexture` from `auraData.icon` or `C_Spell.GetSpellTexture`)
 - Desaturation (`SetDesaturated` for missing aura mode)
 - Cooldown (`SafeSetCooldown`, show/hide swipe)
@@ -101,7 +101,7 @@ Engine:UpdateFrame(frame)
 
 ### ConfigureSquare (static)
 
-- Size, scale, alpha, position, anchor, offsets
+- Size, scale, alpha
 - Frame level, frame strata
 - Border show/hide, thickness
 - Texture color (from `config.color`)
@@ -115,6 +115,7 @@ Engine:UpdateFrame(frame)
 
 ### UpdateSquare (dynamic)
 
+- Position (`ClearAllPoints` + `SetPoint`) — dynamic for layout groups
 - Cooldown (`SafeSetCooldown`)
 - Stack count text
 - Desaturation for missing aura
@@ -130,7 +131,7 @@ Engine:UpdateFrame(frame)
 - Size, orientation (`SetOrientation`), fill direction (`SetReverseFill`)
 - StatusBar texture (`SetStatusBarTexture`), background color
 - Border frame + backdrop
-- Position, anchor, offsets, frame level, frame strata
+- Frame level, frame strata
 - Color curve building (`C_CurveUtil.CreateColorCurve`) + storing on bar (`dfAD_colorCurve`)
 - Color flags: `dfAD_barColorByTime`, `dfAD_fillR/G/B`, `dfAD_expiringEnabled`, `dfAD_expiringThreshold`
 - Duration font, size, outline, anchor
@@ -140,6 +141,7 @@ Engine:UpdateFrame(frame)
 
 ### UpdateBar (dynamic)
 
+- Position (`ClearAllPoints` + `SetPoint`) — dynamic for layout groups
 - `dfAD_auraInstanceID`, `dfAD_unit` assignment
 - Fill via `SetTimerDuration` (secret-safe) or `SetValue` (preview fallback)
 - Initial color curve evaluation + `SetStatusBarColor`
