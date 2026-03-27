@@ -2320,6 +2320,19 @@ function DF:UpdateTestOverlayBorder(frame)
     for i = maxSlots + 1, #frame.testOverlayBorders do
         frame.testOverlayBorders[i]:Hide()
     end
+
+    -- Show a warning label on the first border (once per frame)
+    local firstBorder = frame.testOverlayBorders[1]
+    if firstBorder then
+        if not firstBorder.warningText then
+            firstBorder.warningText = firstBorder:CreateFontString(nil, "OVERLAY")
+            firstBorder.warningText:SetFont(STANDARD_TEXT_FONT, 9, "OUTLINE")
+            firstBorder.warningText:SetTextColor(1, 0.2, 0.2, 1)
+            firstBorder.warningText:SetPoint("TOP", firstBorder, "BOTTOM", 0, -2)
+            firstBorder.warningText:SetText("Rough estimate only")
+        end
+        firstBorder.warningText:Show()
+    end
 end
 
 -- Hide overlay border previews
