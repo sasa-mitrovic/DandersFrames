@@ -991,6 +991,17 @@ function FlatRaidFrames:UpdateSorting()
     -- Note: Call directly, no delays (combat safety)
     self:ResizeInnerContainer()
 
+    -- Belt-and-suspenders: In complex sort mode, re-apply nameList on next frame
+    -- to catch any roster data that wasn't fresh at call time. This fixes a timing gap
+    -- where hidden groups could bleed through if the nameList was built from stale data.
+    if not useGroupBy then
+        C_Timer.After(0, function()
+            if not InCombatLockdown() and FlatRaidFrames:IsEnabled() then
+                FlatRaidFrames:UpdateNameList()
+            end
+        end)
+    end
+
     -- Schedule private aura reanchor after all attribute changes settle
     if DF.SchedulePrivateAuraReanchor then
         DF:SchedulePrivateAuraReanchor()
