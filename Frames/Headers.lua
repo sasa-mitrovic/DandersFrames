@@ -6997,8 +6997,8 @@ function DF:ApplyHeaderSettings()
     local raidHorizontal = (raidDb.growDirection == "HORIZONTAL")
 
     if raidDb.raidUseGroups then
-        -- Separated mode: use growthAnchor for groups
-        local raidGrowFrom = raidDb.growthAnchor or "START"
+        -- Separated mode: use raidGroupAnchor for groups
+        local raidGrowFrom = raidDb.raidGroupAnchor or "START"
         DF:SetRaidOrientation(false, raidGrowFrom)
     else
         -- Combined/flat mode: use raidFlatPlayerAnchor (different setting!)
