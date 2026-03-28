@@ -996,7 +996,7 @@ function FlatRaidFrames:UpdateSorting()
     -- where hidden groups could bleed through if the nameList was built from stale data.
     if not useGroupBy then
         C_Timer.After(0, function()
-            if not InCombatLockdown() and FlatRaidFrames:IsEnabled() then
+            if not InCombatLockdown() and FlatRaidFrames.header and FlatRaidFrames.header:IsShown() then
                 FlatRaidFrames:UpdateNameList()
             end
         end)
