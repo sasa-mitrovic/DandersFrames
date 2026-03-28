@@ -994,10 +994,15 @@ function FlatRaidFrames:UpdateSorting()
     -- Belt-and-suspenders: In complex sort mode, re-apply nameList on next frame
     -- to catch any roster data that wasn't fresh at call time. This fixes a timing gap
     -- where hidden groups could bleed through if the nameList was built from stale data.
+    -- NOTE: We call BuildSortedNameList() directly here instead of UpdateNameList()/UpdateSorting()
+    -- to avoid an infinite loop: UpdateSorting() in complex mode always schedules this same
+    -- deferred timer, so calling UpdateNameList() here would cause it to fire every frame.
     if not useGroupBy then
         C_Timer.After(0, function()
             if not InCombatLockdown() and FlatRaidFrames.header and FlatRaidFrames.header:IsShown() then
-                FlatRaidFrames:UpdateNameList()
+                -- Refresh nameList directly to avoid re-entering UpdateSorting
+                local nameList = FlatRaidFrames:BuildSortedNameList()
+                FlatRaidFrames.header:SetAttribute("nameList", nameList)
             end
         end)
     end
