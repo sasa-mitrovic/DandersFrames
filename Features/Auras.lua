@@ -1117,14 +1117,23 @@ function DF:DirectModeRosterUpdate()
 end
 
 -- Switch between Blizzard and Direct modes
+-- Always forces a full teardown + reinit so profile switches with
+-- different data sources (or different filter settings) take effect.
 function DF:SetAuraSourceMode(mode)
     -- Clear all caches so stale data doesn't persist
     wipe(DF.BlizzardAuraCache)
 
+    -- Force-teardown current mode first so Enable/Disable don't early-return
+    -- when the mode hasn't changed (filters or profile may still differ)
+    if directModeActive then
+        directModeActive = false
+        directModeFrame:UnregisterAllEvents()
+        directModeFrame:SetScript("OnEvent", nil)
+    end
+
     if mode == "DIRECT" then
         DF:EnableDirectAuraMode()
     else
-        DF:DisableDirectAuraMode()
         -- Restore events on Blizzard frames that were fully stripped during Direct mode
         -- Without this, UNIT_AURA never fires and the Blizzard hook can't repopulate the cache
         if DF.RestoreStrippedFrameEvents then

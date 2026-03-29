@@ -827,7 +827,7 @@ function DF:AutoFitOverlayBorder(mode)
 
     -- Clamp to slider ranges
     newScale = math.max(0.1, math.min(5.0, newScale))
-    newRatio = math.max(0.5, math.min(10.0, newRatio))
+    newRatio = math.max(0.5, math.min(15.0, newRatio))
 
     -- Round to slider step precision
     newScale = math.floor(newScale / 0.05 + 0.5) * 0.05

@@ -2296,8 +2296,39 @@ WB:RegisterBuiltinWizard({
                             label = "Disable Overlay",
                             value = "disable",
                             image = "Interface\\AddOns\\DandersFrames\\Textures\\Wizards\\overlay_disabled",
-                            texCoord = {0, 1, 0, 0.5625},
+                            texCoord = {0, 0.6602, 0, 0.3789},
                         },
+                    },
+                    branches = {
+                        { condition = { equals = "disable" }, ["goto"] = "summary" },
+                    },
+                    next = "overlay_warning",
+                },
+                {
+                    id = "overlay_warning",
+                    question = "Before You Enable",
+                    description = "The frame border overlay is rendered entirely by Blizzard and has some visual quirks that cannot be fixed:\n\n"
+                        .. "|cFFFF8800Orange borders|r will appear for boss debuffs that are |cFFFF4444not dispellable|r. Only dispellable debuffs show the standard coloured border.\n\n"
+                        .. "Floating |cFFFFFF00stack count text|r may appear on the frame, separate from the icon.\n\n"
+                        .. "The overlay is not a perfect solution and may look rough in some encounters. Enable at your own risk.",
+                    type = "imageselect",
+                    imageAspect = 1.48,
+                    options = {
+                        {
+                            label = "I understand, enable it",
+                            value = "confirm",
+                            image = "Interface\\AddOns\\DandersFrames\\Textures\\Wizards\\overlay_warning",
+                            texCoord = {0, 0.8555, 0, 0.5781},
+                        },
+                        {
+                            label = "Actually, disable it",
+                            value = "cancel",
+                            image = "Interface\\AddOns\\DandersFrames\\Textures\\Wizards\\overlay_disabled",
+                            texCoord = {0, 0.6602, 0, 0.3789},
+                        },
+                    },
+                    branches = {
+                        { condition = { equals = "cancel" }, ["goto"] = "summary" },
                     },
                     next = "summary",
                 },
@@ -2317,6 +2348,12 @@ WB:RegisterBuiltinWizard({
                         ["raid.bossDebuffsOverlayEnabled"] = true,
                     },
                     disable = {
+                        ["party.bossDebuffsOverlayEnabled"] = false,
+                        ["raid.bossDebuffsOverlayEnabled"] = false,
+                    },
+                },
+                overlay_warning = {
+                    cancel = {
                         ["party.bossDebuffsOverlayEnabled"] = false,
                         ["raid.bossDebuffsOverlayEnabled"] = false,
                     },

@@ -4575,11 +4575,13 @@ function DF:SetupGUIPages(GUI, CreateCategory, CreateSubTab, BuildPage)
             if DF.UpdateAllTestBossDebuffs then DF:UpdateAllTestBossDebuffs() end
         end), 30)
         hideTooltip.hideOn = HideBossDebuffOptions
-        local stackScale = settingsGroup:AddWidget(GUI:CreateSlider(self.child, "Stack Text Scale", 0.5, 3.0, 0.1, db, "bossDebuffsStackScale", nil, function()
-            if DF.RefreshAllPrivateAuraAnchors then DF:RefreshAllPrivateAuraAnchors() end
-            if DF.UpdateAllTestBossDebuffs then DF:UpdateAllTestBossDebuffs() end
-        end, true), 55)
-        stackScale.hideOn = HideBossDebuffOptions
+        -- Stack Text Scale slider — hidden for now until double-anchor approach is validated.
+        -- Uncomment to re-enable: the setting and anchor logic in PrivateAuras.lua are still active.
+        -- local stackScale = settingsGroup:AddWidget(GUI:CreateSlider(self.child, "Stack Text Scale", 0.5, 3.0, 0.1, db, "bossDebuffsStackScale", nil, function()
+        --     if DF.RefreshAllPrivateAuraAnchors then DF:RefreshAllPrivateAuraAnchors() end
+        --     if DF.UpdateAllTestBossDebuffs then DF:UpdateAllTestBossDebuffs() end
+        -- end, true), 55)
+        -- stackScale.hideOn = HideBossDebuffOptions
         Add(settingsGroup, nil, 1)
 
         -- ===== POSITION GROUP (Column 2) =====
@@ -4614,13 +4616,43 @@ function DF:SetupGUIPages(GUI, CreateCategory, CreateSubTab, BuildPage)
         local iconWidth = sizeGroup:AddWidget(GUI:CreateSlider(self.child, "Icon Width", 10, 60, 1, db, "bossDebuffsIconWidth", nil, function()
             if DF.PreviewPrivateAuraAnchors then DF:PreviewPrivateAuraAnchors() end
             if DF.UpdateAllTestBossDebuffs then DF:UpdateAllTestBossDebuffs() end
+            self:RefreshStates()
         end, true), 55)
         iconWidth.hideOn = HideBossDebuffOptions
         local iconHeight = sizeGroup:AddWidget(GUI:CreateSlider(self.child, "Icon Height", 10, 60, 1, db, "bossDebuffsIconHeight", nil, function()
             if DF.PreviewPrivateAuraAnchors then DF:PreviewPrivateAuraAnchors() end
             if DF.UpdateAllTestBossDebuffs then DF:UpdateAllTestBossDebuffs() end
+            self:RefreshStates()
         end, true), 55)
         iconHeight.hideOn = HideBossDebuffOptions
+
+        -- Stack text warning note + "Show me" button container
+        local stackNoteContainer = CreateFrame("Frame", nil, self.child)
+        stackNoteContainer:SetSize(250, 55)
+        local stackNoteLabel = stackNoteContainer:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        stackNoteLabel:SetPoint("TOPLEFT", stackNoteContainer, "TOPLEFT", 0, 0)
+        stackNoteLabel:SetWidth(250)
+        stackNoteLabel:SetJustifyH("LEFT")
+        stackNoteLabel:SetText("|cFFFF4444Note:|r Icons smaller than 30x30 may hide stack text behind duration text. At small sizes, consider disabling duration numbers.")
+        local showMeBtn = CreateFrame("Button", nil, stackNoteContainer, "BackdropTemplate")
+        showMeBtn:SetSize(55, 18)
+        showMeBtn:SetPoint("TOPLEFT", stackNoteLabel, "BOTTOMLEFT", 0, -4)
+        if not showMeBtn.SetBackdrop then Mixin(showMeBtn, BackdropTemplateMixin) end
+        showMeBtn:SetBackdrop({ bgFile = "Interface\\Buttons\\WHITE8x8", edgeFile = "Interface\\Buttons\\WHITE8x8", edgeSize = 1 })
+        showMeBtn:SetBackdropColor(0.15, 0.15, 0.15, 0.9)
+        showMeBtn:SetBackdropBorderColor(0.4, 0.4, 0.4, 1)
+        local showMeText = showMeBtn:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        showMeText:SetPoint("CENTER")
+        showMeText:SetText("|cFFFFFF00Show me|r")
+        showMeBtn:SetScript("OnClick", function()
+            DF:HighlightSettings("auras_bossdebuffs", { "bossDebuffsShowNumbers" })
+        end)
+        showMeBtn:SetScript("OnEnter", function(s) s:SetBackdropBorderColor(0.6, 0.6, 0.6, 1) end)
+        showMeBtn:SetScript("OnLeave", function(s) s:SetBackdropBorderColor(0.4, 0.4, 0.4, 1) end)
+        local stackNote = sizeGroup:AddWidget(stackNoteContainer, 65)
+        stackNote.hideOn = function(d)
+            return not d.bossDebuffsEnabled or ((d.bossDebuffsIconWidth or 20) >= 30 and (d.bossDebuffsIconHeight or 20) >= 30)
+        end
         local borderScale = sizeGroup:AddWidget(GUI:CreateSlider(self.child, "Border Scale", 0, 2.0, 0.1, db, "bossDebuffsBorderScale", nil, function()
             if DF.PreviewPrivateAuraAnchors then DF:PreviewPrivateAuraAnchors() end
             if DF.UpdateAllTestBossDebuffs then DF:UpdateAllTestBossDebuffs() end
@@ -4644,6 +4676,17 @@ function DF:SetupGUIPages(GUI, CreateCategory, CreateSubTab, BuildPage)
         overlayGroup:AddWidget(GUI:CreateHeader(self.child, "Frame Border Overlay"), 40)
         overlayGroup:AddWidget(GUI:CreateLabel(self.child, "Shows a border ring around the entire frame when a boss debuff is active.", 250), 35)
         overlayGroup:AddWidget(GUI:CreateCheckbox(self.child, "Enable Frame Border Overlay", db, "bossDebuffsOverlayEnabled", function()
+            -- Show warning wizard on first enable attempt
+            if db.bossDebuffsOverlayEnabled and not DandersFramesDB_v2.seenOverlayWarning then
+                -- Revert the checkbox — the wizard will set the value if confirmed
+                db.bossDebuffsOverlayEnabled = false
+                DandersFramesDB_v2.seenOverlayWarning = true
+                if DF.WizardBuilder and DF.WizardBuilder.RunWizard then
+                    DF.WizardBuilder:RunWizard("private_aura_overlay_setup")
+                end
+                self:RefreshStates()
+                return
+            end
             self:RefreshStates()
             -- Auto-fit on first enable
             if db.bossDebuffsOverlayEnabled and DF.AutoFitOverlayBorder then
@@ -4666,7 +4709,7 @@ function DF:SetupGUIPages(GUI, CreateCategory, CreateSubTab, BuildPage)
             if DF.RefreshAllPrivateAuraAnchors then DF:RefreshAllPrivateAuraAnchors() end
         end, true), 55)
         ovScale.hideOn = HideOverlayOptions
-        local ovRatio = overlayGroup:AddWidget(GUI:CreateSlider(self.child, "Icon Ratio", 0.5, 10.0, 0.1, db, "bossDebuffsOverlayIconRatio", nil, function()
+        local ovRatio = overlayGroup:AddWidget(GUI:CreateSlider(self.child, "Icon Ratio", 0.5, 15.0, 0.1, db, "bossDebuffsOverlayIconRatio", nil, function()
             if DF.RefreshAllPrivateAuraAnchors then DF:RefreshAllPrivateAuraAnchors() end
         end, true), 55)
         ovRatio.hideOn = HideOverlayOptions
