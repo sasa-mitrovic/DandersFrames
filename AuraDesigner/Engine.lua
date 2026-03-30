@@ -226,6 +226,10 @@ end
 
 function Engine:ResolveSpec(adDB)
     if adDB.spec == "auto" then
+        if not Adapter then
+            Adapter = DF.AuraDesigner.Adapter
+        end
+        if not Adapter then return nil end
         return Adapter:GetPlayerSpec()
     end
     return adDB.spec

@@ -1,28 +1,45 @@
 local addonName, DF = ...
-DF.BUILD_DATE = "2026-03-27T23:32:10Z"
+DF.BUILD_DATE = "2026-03-31T00:00:00Z"
 DF.RELEASE_CHANNEL = "alpha"
 DF.CHANGELOG_TEXT = [===[
 # DandersFrames Changelog
 
+## [4.1.10] - 2026-03-31
+
+### New Features
+* (API) Add layout config endpoints — `DandersFrames_GetPartyConfig()` and `DandersFrames_GetRaidConfig()` for external addons to read frame dimensions, spacing, and layout settings
+* (Boss Debuffs) Add Text Scale slider — scales timer and stack count text independently from icon size
+
+### Bug Fixes
+* (Frames) Fix frames staying stuck as offline when a player reconnects — stale detection now tracks connection state independently from the fade setting, so recovery works even with "Fade Dead Frames" disabled
+* (Grouped Raids) Fix groups briefly overlapping when someone joins the raid — added delayed safety-net reposition to catch deferred child visibility changes from SecureGroupHeaderTemplate
+* (Boss Debuffs) Fix overlay border showing tooltips — overlay containers no longer propagate mouse events, matching Blizzard's approach for border-only indicators
+* (Aura Designer) Fix Adapter nil error in ResolveSpec when spec is set to auto — added lazy init fallback
+* (Click-Casting) Fix deleted left/right click bindings being silently restored — respect user's choice when they remove default bindings from a profile
+
 ## [4.1.9] - 2026-03-27
 
 ### New Features
-* (Boss Debuffs) **Frame Border Overlay** — adds a border around the entire unit frame when private aura boss debuffs are active. Includes settings for border scale, icon ratio, frame level, max slots, and clip-to-frame. An auto-fit button calculates optimal border size from your frame dimensions
-* (Boss Debuffs) **Overlay Setup Wizard** — guided setup that explains the overlay feature and lets users enable/disable it with image previews. Runs automatically for existing users on first login, or manually via the Boss Debuffs settings tab
-* (Boss Debuffs) **Hide Tooltip** option — shrinks the private aura parent frame to sub-pixel size so hovering over boss debuff icons no longer shows a tooltip, while the icon remains visible
-* (Boss Debuffs) **Test Mode Overlay Preview** — test mode now shows a coloured border approximation of the overlay so you can tune settings without being in combat
+* (Boss Debuffs) **Frame Border Overlay** — shows a border around the entire unit frame when boss debuffs are active, with auto-fit sizing and adjustable settings
+* (Boss Debuffs) **Overlay Setup Wizard** — guided setup with image previews when enabling the overlay for the first time, including a warning about visual quirks
+* (Boss Debuffs) **Hide Tooltip** option — prevents the tooltip from appearing when hovering over boss debuff icons
+* (Boss Debuffs) **Test Mode Overlay Preview** — preview the overlay border in test mode without needing to be in combat
 
 ### Changes
-* (Boss Debuffs) Rewrite private aura system to use a single anchor per icon instead of the dual-anchor approach — simpler, cleaner, and eliminates duplicate text and sizing issues
-* (Boss Debuffs) Remove deprecated settings: text scale/offset, click-casting toggle, debug overlay, and unused scale setting
+* (Boss Debuffs) Simplified private aura system — cleaner single-anchor approach, removed unused settings
+* (Boss Debuffs) Overlay icon ratio slider now goes up to 15 to support very wide frames
 
 ### Bug Fixes
-* (Auras) Fix Blizzard aura mode not repopulating cache when switching from Direct mode — stripped frame events are now restored on mode switch
-* (Auras) Fix profile switch not initializing Direct API aura mode — switching to a profile using Direct API now populates the aura cache immediately
-* (Aura Designer) Fix indicator icons, squares, and bars blocking click-casting in combat — refactored to configure-once pattern so mouse propagation is set outside combat and never reset
+* (Auras) Fix auras not showing after switching profiles with different data source settings
+* (Aura Designer) Fix indicator icons blocking click-casting in combat
+* (Grouped Raids) Fix groups growing from the wrong direction after changing settings
+* (Grouped Raids) Fix group display order resetting when changing raid settings
+* (Grouped Raids) Fix group labels misaligning after switching layout direction
+* (Flat Raids) Fix hidden groups sometimes showing frames when sorting is active
+* (Flat Raids) Fix a group disappearing after roster changes during combat
 
 ### Performance
-* (Aura Designer) Reduce per-event work for indicator updates — static properties (size, strata, fonts, borders, propagation) are now set once on config change instead of every aura event
+* (Aura Designer) Reduced per-event work — static properties are now set once on config change instead of every aura event
 
 ## [4.1.8] - 2026-03-26
 

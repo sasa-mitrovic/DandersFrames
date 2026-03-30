@@ -1,5 +1,18 @@
 # DandersFrames Changelog
 
+## [4.1.10] - 2026-03-31
+
+### New Features
+* (API) Add layout config endpoints — `DandersFrames_GetPartyConfig()` and `DandersFrames_GetRaidConfig()` for external addons to read frame dimensions, spacing, and layout settings
+* (Boss Debuffs) Add Text Scale slider — scales timer and stack count text independently from icon size
+
+### Bug Fixes
+* (Frames) Fix frames staying stuck as offline when a player reconnects — stale detection now tracks connection state independently from the fade setting, so recovery works even with "Fade Dead Frames" disabled
+* (Grouped Raids) Fix groups briefly overlapping when someone joins the raid — added delayed safety-net reposition to catch deferred child visibility changes from SecureGroupHeaderTemplate
+* (Boss Debuffs) Fix overlay border showing tooltips — overlay containers no longer propagate mouse events, matching Blizzard's approach for border-only indicators
+* (Aura Designer) Fix Adapter nil error in ResolveSpec when spec is set to auto — added lazy init fallback
+* (Click-Casting) Fix deleted left/right click bindings being silently restored — respect user's choice when they remove default bindings from a profile
+
 ## [4.1.9] - 2026-03-27
 
 ### New Features

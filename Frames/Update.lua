@@ -574,9 +574,10 @@ function DF:UpdateUnitFrame(frame, source)
         end
         -- Apply dead fade for offline units
         DF:ApplyDeadFade(frame, "Offline")
+        frame.dfLastKnownConnected = false
         return
     end
-    
+
     -- ========================================
     -- DEAD/GHOST CHECK
     -- ========================================
@@ -636,13 +637,14 @@ function DF:UpdateUnitFrame(frame, source)
     
     -- Unit is alive and connected - reset dead fade if it was applied
     DF:ResetDeadFade(frame)
-    
+    frame.dfLastKnownConnected = true
+
     -- Clear status text for alive units
     if frame.statusText then
         frame.statusText:SetText("")
         frame.statusText:Hide()
     end
-    
+
     -- ========================================
     -- HEALTH
     -- ========================================
@@ -971,6 +973,7 @@ function DF:UpdateHealthFast(frame)
             frame.dfHealAbsorbBar:Hide()
         end
         DF:ApplyDeadFade(frame, "Offline")
+        frame.dfLastKnownConnected = false
         return
     end
 
@@ -1011,6 +1014,7 @@ function DF:UpdateHealthFast(frame)
 
     -- Unit is alive and connected - reset dead fade if it was applied
     DF:ResetDeadFade(frame)
+    frame.dfLastKnownConnected = true
 
     -- Clear resurrection icon if unit was pending a res and is now alive
     if DF.HasPendingResurrection and DF:HasPendingResurrection(unit) then

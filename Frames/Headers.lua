@@ -4182,6 +4182,15 @@ function DF:ApplyRaidGroupSorting()
     end
     DF:TriggerRaidPosition()
 
+    -- Safety net: SecureGroupHeaderTemplate may defer child Show/Hide past
+    -- the synchronous reposition above. Re-trigger after a brief delay to
+    -- catch any stale group counts. (#571)
+    C_Timer.After(0.05, function()
+        if not InCombatLockdown() then
+            DF:TriggerRaidPosition()
+        end
+    end)
+
     -- Log header positions after reposition for diagnosis
     if DF.raidSeparatedHeaders then
         for i = 1, 8 do
@@ -7986,6 +7995,12 @@ function DF:ProcessRosterUpdate()
         -- children internally). TriggerRaidPosition is cheap and has a flat-mode guard.
         if IsInRaid() and raidDb and raidDb.raidUseGroups then
             DF:TriggerRaidPosition()
+            -- Safety net: deferred child visibility may cause stale counts (#571)
+            C_Timer.After(0.05, function()
+                if not InCombatLockdown() then
+                    DF:TriggerRaidPosition()
+                end
+            end)
         end
         return
     end
@@ -8370,9 +8385,11 @@ headerChildEventFrame:SetScript("OnEvent", function(self, event, arg1)
                     recheckFrame = unitFrameMap[unit]
                 end
                 if recheckFrame and recheckFrame.dfEventsEnabled ~= false then
-                    -- Stale state: connected+alive but still faded, or disconnected but not faded
-                    local stale = (isConnected and not isDead and recheckFrame.dfDeadFadeApplied)
-                                  or (not isConnected and not recheckFrame.dfDeadFadeApplied)
+                    -- Stale state: frame's tracked connection state doesn't match reality.
+                    -- Uses dfLastKnownConnected instead of dfDeadFadeApplied so it works
+                    -- even when fadeDeadFrames is disabled. (#570)
+                    local frameThinks = recheckFrame.dfLastKnownConnected
+                    local stale = (frameThinks == nil) or (isConnected ~= frameThinks)
                     if stale and DF.UpdateUnitFrame then
                         DF:UpdateUnitFrame(recheckFrame)
                     end
@@ -8380,8 +8397,8 @@ headerChildEventFrame:SetScript("OnEvent", function(self, event, arg1)
                 -- Also re-check pinned frame
                 local recheckPinned = FindPinnedFrameForUnit(unit)
                 if recheckPinned and recheckPinned.dfEventsEnabled ~= false then
-                    local stale = (isConnected and not isDead and recheckPinned.dfDeadFadeApplied)
-                                  or (not isConnected and not recheckPinned.dfDeadFadeApplied)
+                    local frameThinks = recheckPinned.dfLastKnownConnected
+                    local stale = (frameThinks == nil) or (isConnected ~= frameThinks)
                     if stale and DF.UpdateUnitFrame then
                         DF:UpdateUnitFrame(recheckPinned)
                     end

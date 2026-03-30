@@ -2492,7 +2492,7 @@ function CC:ApplyBindingsToFrameUnified(frame, skipKeyboardUpdate)
             frame:RegisterForClicks("AnyUp")
         end
     end
-    
+
     -- Enable mouse wheel for scroll bindings (like Clique does)
     if frame.EnableMouseWheel then
         frame:EnableMouseWheel(true)
@@ -2529,7 +2529,7 @@ function CC:ApplyBindingsToFrameUnified(frame, skipKeyboardUpdate)
                 -- Mouse binding: use frame attributes
                 local buttonNum = GetButtonNumber(binding.button)
                 local modPrefix = BuildModifierPrefix(binding.modifiers)
-                
+
                 local typeAttr = modPrefix .. "type" .. buttonNum
                 local spellAttr = modPrefix .. "spell" .. buttonNum
                 local macroAttr = modPrefix .. "macrotext" .. buttonNum
@@ -2637,22 +2637,13 @@ function CC:ApplyBindingsToFrameUnified(frame, skipKeyboardUpdate)
         end
     end
     
-    -- Preserve default click behavior for buttons that weren't explicitly bound
-    -- This ensures left click = target and right click = menu work unless overridden
-    -- Check for both nil and empty string since ClearBindingsFromFrame sets to ""
-    local type1 = frame:GetAttribute("type1")
-    if not type1 or type1 == "" then
-        frame:SetAttribute("type1", "target")
-        -- For Blizzard frames, set unit1="mouseover" to ensure targeting works
-        -- This is needed because type="target" uses the unit attribute
-        if frame.dfIsBlizzardFrame then
-            frame:SetAttribute("unit1", "mouseover")
-        end
-    end
-    local type2 = frame:GetAttribute("type2")
-    if not type2 or type2 == "" then
-        frame:SetAttribute("type2", "togglemenu")
-    end
+    -- NOTE: We intentionally do NOT restore default type1/type2 here.
+    -- If the user's profile has no LeftButton or RightButton binding,
+    -- that means they deleted it — respect that choice.
+    -- Defaults are already handled by:
+    --   1. InitializeHeaderChild (sets type1=target, type2=togglemenu on creation)
+    --   2. The hasAnyBindings early-return above (restores Blizzard defaults
+    --      when the profile has zero bindings at all)
     
     -- Mark this frame as having had bindings applied (for optimization in ClearBindingsFromFrame)
     frame.dfBindingsEverApplied = true

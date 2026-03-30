@@ -4575,13 +4575,11 @@ function DF:SetupGUIPages(GUI, CreateCategory, CreateSubTab, BuildPage)
             if DF.UpdateAllTestBossDebuffs then DF:UpdateAllTestBossDebuffs() end
         end), 30)
         hideTooltip.hideOn = HideBossDebuffOptions
-        -- Stack Text Scale slider — hidden for now until double-anchor approach is validated.
-        -- Uncomment to re-enable: the setting and anchor logic in PrivateAuras.lua are still active.
-        -- local stackScale = settingsGroup:AddWidget(GUI:CreateSlider(self.child, "Stack Text Scale", 0.5, 3.0, 0.1, db, "bossDebuffsStackScale", nil, function()
-        --     if DF.RefreshAllPrivateAuraAnchors then DF:RefreshAllPrivateAuraAnchors() end
-        --     if DF.UpdateAllTestBossDebuffs then DF:UpdateAllTestBossDebuffs() end
-        -- end, true), 55)
-        -- stackScale.hideOn = HideBossDebuffOptions
+        local textScale = settingsGroup:AddWidget(GUI:CreateSlider(self.child, "Text Scale", 0.5, 3.0, 0.05, db, "bossDebuffsTextScale", nil, function()
+            if DF.RefreshAllPrivateAuraAnchors then DF:RefreshAllPrivateAuraAnchors() end
+            if DF.UpdateAllTestBossDebuffs then DF:UpdateAllTestBossDebuffs() end
+        end, true), 55)
+        textScale.hideOn = HideBossDebuffOptions
         Add(settingsGroup, nil, 1)
 
         -- ===== POSITION GROUP (Column 2) =====

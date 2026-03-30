@@ -357,6 +357,58 @@ function DandersFrames_ClickCast_GetCurrentProfile()
 end
 
 -- ============================================================
+-- LAYOUT & SIZE CONFIG
+-- Returns a snapshot of frame dimensions, scale, spacing, and
+-- layout settings for the given mode. External addons can use
+-- these to size/position companion elements without guesswork.
+-- ============================================================
+
+-- Get party frame layout config
+-- Returns: table with size/spacing/layout settings, or nil if not ready
+--   .frameWidth      number  Frame width in pixels
+--   .frameHeight     number  Frame height in pixels
+--   .frameScale      number  Scale factor (1.0 = 100%)
+--   .framePadding    number  Internal padding in pixels
+--   .frameSpacing    number  Spacing between frames in pixels
+--   .growDirection   string  "HORIZONTAL" or "VERTICAL"
+--   .growthAnchor    string  Anchor point for growth (e.g. "CENTER")
+--   .pixelPerfect    boolean Whether pixel-perfect positioning is enabled
+function DandersFrames_GetPartyConfig()
+    if not DF or not DF.db or not DF.db.party then return nil end
+    local db = DF.db.party
+    return {
+        frameWidth    = db.frameWidth,
+        frameHeight   = db.frameHeight,
+        frameScale    = db.frameScale,
+        framePadding  = db.framePadding,
+        frameSpacing  = db.frameSpacing,
+        growDirection = db.growDirection,
+        growthAnchor  = db.growthAnchor,
+        pixelPerfect  = db.pixelPerfect,
+    }
+end
+
+-- Get raid frame layout config
+-- Returns: table with size/spacing/layout settings, or nil if not ready
+--   Same fields as GetPartyConfig, plus:
+--   .raidUseGroups   boolean Whether raid is in grouped/separated mode
+function DandersFrames_GetRaidConfig()
+    if not DF or not DF.db or not DF.db.raid then return nil end
+    local db = DF.db.raid
+    return {
+        frameWidth    = db.frameWidth,
+        frameHeight   = db.frameHeight,
+        frameScale    = db.frameScale,
+        framePadding  = db.framePadding,
+        frameSpacing  = db.frameSpacing,
+        growDirection = db.growDirection,
+        growthAnchor  = db.growthAnchor,
+        pixelPerfect  = db.pixelPerfect,
+        raidUseGroups = db.raidUseGroups,
+    }
+end
+
+-- ============================================================
 -- VERSION INFO
 -- ============================================================
 
