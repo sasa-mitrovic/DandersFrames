@@ -7,7 +7,7 @@ DF.CHANGELOG_TEXT = [===[
 ## [4.1.10] - 2026-03-31
 
 ### New Features
-* (API) Add layout config endpoints for external addons to read frame size, spacing, and layout settings
+* (API) Add layout config endpoints — `DandersFrames_GetPartyConfig()` and `DandersFrames_GetRaidConfig()` return frame dimensions, scale, spacing, and layout settings for external addon integration
 * (Boss Debuffs) Add Text Scale slider for timer and stack count text
 
 ### Bug Fixes
