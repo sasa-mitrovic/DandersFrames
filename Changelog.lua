@@ -26,6 +26,8 @@ DF.CHANGELOG_TEXT = [===[
 * (Frames) Fix resource bar not showing in delves due to unassigned role
 * (Grouped Raids) Fix raid frame anchor shifting position when changing specs
 * (Frames) Fix summon icon staying visible after a player leaves the group
+* (Boss Debuffs) Fix hide tooltip setting hiding boss debuff icons in test mode
+* (Blizzard Frames) Fix side menu flickering when set to hidden
 
 ## [4.1.9] - 2026-03-27
 

@@ -2770,20 +2770,21 @@ function DF:UpdateBlizzardFrameVisibility()
         SafeHideFrame(groupFrame, hideRaidFrames)
     end
     
-    -- Force hide/show a frame using actual Hide()/Show() outside combat,
-    -- falling back to SetAlpha inside combat to avoid taint
+    -- Force hide/show a frame using actual Hide() outside combat,
+    -- falling back to SetAlpha inside combat to avoid taint.
+    -- When showing, only restore alpha — do NOT call Show() as that triggers
+    -- the hooksecurefunc hooks installed above which would immediately re-hide.
     local function ForceHideShow(frame, hide)
         if not frame then return end
         pcall(function()
-            if InCombatLockdown() then
-                frame:SetAlpha(hide and 0 or 1)
-            else
-                if hide then
-                    frame:Hide()
+            if hide then
+                if InCombatLockdown() then
+                    frame:SetAlpha(0)
                 else
-                    frame:SetAlpha(1)
-                    frame:Show()
+                    frame:Hide()
                 end
+            else
+                frame:SetAlpha(1)
             end
         end)
     end
@@ -2837,23 +2838,25 @@ blizzFrameEventHandler:RegisterEvent("RAID_ROSTER_UPDATE")
 blizzFrameEventHandler:RegisterEvent("PARTY_MEMBER_ENABLE")
 blizzFrameEventHandler:RegisterEvent("PARTY_MEMBER_DISABLE")
 
+-- Coalesce rapid-fire events into a single deferred update to prevent
+-- the multiple timer callbacks from fighting each other and causing flicker
+local blizzVisibilityPending = false
+
 blizzFrameEventHandler:SetScript("OnEvent", function(self, event)
     if event == "GROUP_ROSTER_UPDATE" then
         if DF.RosterDebugEvent then DF:RosterDebugEvent("Auras.lua(visibility):GROUP_ROSTER_UPDATE") end
     end
-    -- Delay slightly to let frames initialize/reposition
-    C_Timer.After(0.2, function()
-        if DF.UpdateBlizzardFrameVisibility then
-            DF:UpdateBlizzardFrameVisibility()
-        end
-    end)
-    
-    -- Do another update shortly after in case frames are still moving
-    C_Timer.After(0.5, function()
-        if DF.UpdateBlizzardFrameVisibility then
-            DF:UpdateBlizzardFrameVisibility()
-        end
-    end)
+    -- Debounced update — first event arms the timer, subsequent events within
+    -- the window are ignored; the single callback fires once Blizzard has settled
+    if not blizzVisibilityPending then
+        blizzVisibilityPending = true
+        C_Timer.After(0.3, function()
+            blizzVisibilityPending = false
+            if DF.UpdateBlizzardFrameVisibility then
+                DF:UpdateBlizzardFrameVisibility()
+            end
+        end)
+    end
     
     -- For target changes, also do an immediate check to hide selection highlights
     if event == "PLAYER_TARGET_CHANGED" then

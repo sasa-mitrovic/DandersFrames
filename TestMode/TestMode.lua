@@ -2146,9 +2146,12 @@ function DF:UpdateTestBossDebuffs(frame)
     -- Use the real private aura system for positioning.
     -- Override unit to "player" so the API call succeeds (player always exists).
     local savedUnit = frame.unit
+    local savedHideTooltip = db.bossDebuffsHideTooltip
+    db.bossDebuffsHideTooltip = false  -- prevent 0.001px sizing; test icons are real frames, not C-side rendered
     frame.unit = "player"
     DF:SetupPrivateAuraAnchors(frame)
     frame.unit = savedUnit
+    db.bossDebuffsHideTooltip = savedHideTooltip
 
     -- Now frame.bossDebuffFrames has positioned frames.
     -- Parent test icon visuals to each frame.
