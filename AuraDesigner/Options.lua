@@ -520,6 +520,9 @@ local function EnsureTypeConfig(auraName, typeKey)
                 combatMode = "ALWAYS",
                 startDelay = 2,
                 loopInterval = 3,
+                expireEnabled = false,
+                expireThreshold = 5,
+                expireThresholdMode = "SECONDS",
             }
         end
     end
@@ -2283,8 +2286,11 @@ local function BuildTypeContent(parent, typeKey, auraName, width, optProxy, yOff
         totalHeight = totalHeight + (height or 30)
     end
 
-    local function AddGroup(header, buildFn)
-        local group = GUI:CreateSettingsGroup(parent, contentWidth - 10)
+    local function AddGroup(header, buildFn, showSummary)
+        local group = GUI:CreateSettingsGroup(parent, contentWidth - 10, {
+            collapsible = true,
+            showSummary = showSummary or false,
+        })
         group.padding = 6
         group:AddWidget(GUI:CreateHeader(parent, header), 25)
         buildFn(group)
@@ -2807,6 +2813,75 @@ local function BuildTypeContent(parent, typeKey, auraName, width, optProxy, yOff
         AddGroup("Timing", function(g)
             g:AddWidget(GUI:CreateSlider(parent, "Start Delay (sec)", 0, 10, 0.5, proxy, "startDelay"), 54)
             g:AddWidget(GUI:CreateSlider(parent, "Loop Interval (sec)", 1, 30, 0.5, proxy, "loopInterval"), 54)
+        end)
+
+        -- Expire Alert
+        AddGroup("Expire Alert", function(g)
+            g:AddWidget(GUI:CreateCheckbox(parent, "Alert When Expiring", proxy, "expireEnabled", function()
+                if not proxy.expireEnabled and DF.AuraDesigner.SoundEngine then
+                    DF.AuraDesigner.SoundEngine:StopAura(auraName)
+                end
+            end), 28)
+
+            -- Threshold slider + mode toggle (same pattern as CreateExpiringThresholdRow)
+            local isSeconds = (proxy.expireThresholdMode or "SECONDS") == "SECONDS"
+            local threshContainer = CreateFrame("Frame", nil, parent)
+            threshContainer:SetHeight(54)
+            threshContainer:SetWidth(contentWidth - 10)
+
+            local thLabel, thMin, thMax, thStep
+            if isSeconds then
+                thLabel = "Expire Threshold (s)"
+                thMin, thMax, thStep = 1, 60, 1
+                local cur = proxy.expireThreshold
+                if cur and cur > 60 then proxy.expireThreshold = 5 end
+            else
+                thLabel = "Expire Threshold %"
+                thMin, thMax, thStep = 5, 100, 5
+                local cur = proxy.expireThreshold
+                if cur and cur < 5 then proxy.expireThreshold = 30 end
+            end
+
+            local thSlider = GUI:CreateSlider(threshContainer, thLabel, thMin, thMax, thStep, proxy, "expireThreshold")
+            thSlider:SetPoint("TOPLEFT", 0, 0)
+            thSlider:SetWidth(contentWidth - 10)
+
+            local thModeBtn = CreateFrame("Button", nil, threshContainer, "BackdropTemplate")
+            thModeBtn:SetSize(56, 18)
+            thModeBtn:SetPoint("BOTTOMRIGHT", thSlider, "TOPRIGHT", -10, 2)
+
+            local thModeText = thModeBtn:CreateFontString(nil, "OVERLAY")
+            thModeText:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
+            thModeText:SetPoint("CENTER", 0, 0)
+            thModeText:SetText(isSeconds and "Seconds" or "Percent")
+            thModeText:SetTextColor(C_TEXT.r, C_TEXT.g, C_TEXT.b)
+            ApplyBackdrop(thModeBtn,
+                {r = 0.14, g = 0.14, b = 0.17, a = 1},
+                {r = 0.30, g = 0.30, b = 0.35, a = 0.8})
+
+            thModeBtn:SetScript("OnEnter", function(self)
+                self:SetBackdropColor(0.18, 0.18, 0.22, 1)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetText("Threshold Mode")
+                GameTooltip:AddLine(isSeconds and "Currently: Seconds. Click for Percent." or "Currently: Percent. Click for Seconds.", 0.8, 0.8, 0.8, true)
+                GameTooltip:Show()
+            end)
+            thModeBtn:SetScript("OnLeave", function(self)
+                self:SetBackdropColor(0.14, 0.14, 0.17, 1)
+                GameTooltip:Hide()
+            end)
+            thModeBtn:SetScript("OnClick", function()
+                if proxy.expireThresholdMode == "SECONDS" then
+                    proxy.expireThresholdMode = "PERCENT"
+                    proxy.expireThreshold = 30
+                else
+                    proxy.expireThresholdMode = "SECONDS"
+                    proxy.expireThreshold = 5
+                end
+                DF:AuraDesigner_RefreshPage()
+            end)
+
+            g:AddWidget(threshContainer, 54)
         end)
     end
 
@@ -4470,8 +4545,40 @@ CreateEffectCard = function(parent, yPos, effect)
         end
 
         local _, bodyH = BuildTypeContent(body, effect.typeKey, effect.auraName, bodyWidth, proxy, triggersH, indicatorGroup, effect.indicatorID)
-        body:SetHeight((bodyH or 50) + triggersH)
-        totalCardH = totalCardH + (bodyH or 50) + triggersH
+
+        -- Bottom collapse bar for the indicator card
+        local collapseBarH = 14
+        local collapseBar = CreateFrame("Button", nil, body)
+        collapseBar:SetHeight(collapseBarH)
+        collapseBar:SetPoint("BOTTOMLEFT", body, "BOTTOMLEFT", 1, 1)
+        collapseBar:SetPoint("BOTTOMRIGHT", body, "BOTTOMRIGHT", -1, 1)
+
+        local barBg = collapseBar:CreateTexture(nil, "BACKGROUND")
+        barBg:SetAllPoints()
+        barBg:SetColorTexture(1, 1, 1, 0.03)
+
+        local barIcon = collapseBar:CreateTexture(nil, "OVERLAY")
+        barIcon:SetSize(8, 8)
+        barIcon:SetPoint("CENTER", 0, 0)
+        barIcon:SetTexture("Interface\\AddOns\\DandersFrames\\Media\\Icons\\chevron_right")
+        barIcon:SetVertexColor(1, 1, 1, 0.3)
+
+        collapseBar:SetScript("OnEnter", function()
+            barBg:SetColorTexture(1, 1, 1, 0.06)
+            barIcon:SetVertexColor(1, 1, 1, 0.6)
+        end)
+        collapseBar:SetScript("OnLeave", function()
+            barBg:SetColorTexture(1, 1, 1, 0.03)
+            barIcon:SetVertexColor(1, 1, 1, 0.3)
+        end)
+        collapseBar:SetScript("OnClick", function()
+            expandedCards[cardKey] = false
+            SwitchTab("effects")
+        end)
+
+        local contentH = (bodyH or 50) + triggersH + collapseBarH
+        body:SetHeight(contentH)
+        totalCardH = totalCardH + contentH
     end
 
     card:SetHeight(totalCardH)

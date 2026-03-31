@@ -248,7 +248,7 @@ function SoundEngine:RunEvaluation()
     local hasSoundAuras = false
     for auraName, auraCfg in pairs(specAuras) do
         if type(auraCfg) == "table" and auraCfg.sound and auraCfg.sound.enabled then
-            presenceData[auraName] = { present = 0, total = 0, soundCfg = auraCfg.sound }
+            presenceData[auraName] = { present = 0, total = 0, soundCfg = auraCfg.sound, longestRemaining = 0, longestDuration = 0 }
             hasSoundAuras = true
         end
     end
@@ -282,6 +282,15 @@ function SoundEngine:RunEvaluation()
                     pd.total = pd.total + 1
                     if activeAuras and activeAuras[auraName] then
                         pd.present = pd.present + 1
+                        -- Track longest remaining duration for expire alerts
+                        local auraData = activeAuras[auraName]
+                        if auraData.expirationTime and auraData.expirationTime > 0 then
+                            local remaining = auraData.expirationTime - GetTime()
+                            if remaining > pd.longestRemaining then
+                                pd.longestRemaining = remaining
+                                pd.longestDuration = auraData.duration or 0
+                            end
+                        end
                     end
                 end
             end
@@ -305,10 +314,31 @@ function SoundEngine:RunEvaluation()
         self:Evaluate(auraName, pd.soundCfg, isMissing, inCombat)
     end
 
+    -- Evaluate expire alerts (sound when longest remaining duration drops below threshold)
+    for auraName, pd in pairs(presenceData) do
+        local expireCfg = pd.soundCfg
+        if expireCfg.expireEnabled then
+            local isExpiring = false
+            if pd.present > 0 and pd.longestRemaining > 0 then
+                local mode = expireCfg.expireThresholdMode or "SECONDS"
+                if mode == "PERCENT" then
+                    local pct = (pd.longestDuration > 0) and (pd.longestRemaining / pd.longestDuration * 100) or 100
+                    isExpiring = pct <= (expireCfg.expireThreshold or 30)
+                else
+                    isExpiring = pd.longestRemaining <= (expireCfg.expireThreshold or 5)
+                end
+            end
+            self:Evaluate(auraName .. "|expire", expireCfg, isExpiring, inCombat)
+        end
+    end
+
     -- Stop sounds for auras that no longer have sound configs
-    for auraName, s in pairs(soundStates) do
-        if s.state ~= STATE_IDLE and not presenceData[auraName] then
-            self:TransitionTo(auraName, STATE_IDLE)
+    for stateKey, s in pairs(soundStates) do
+        if s.state ~= STATE_IDLE then
+            local baseAura = stateKey:match("^(.+)|expire$") or stateKey
+            if not presenceData[baseAura] then
+                self:TransitionTo(stateKey, STATE_IDLE)
+            end
         end
     end
 end
@@ -328,6 +358,10 @@ end
 function SoundEngine:StopAura(auraName)
     if soundStates[auraName] and soundStates[auraName].state ~= STATE_IDLE then
         self:TransitionTo(auraName, STATE_IDLE)
+    end
+    local expireKey = auraName .. "|expire"
+    if soundStates[expireKey] and soundStates[expireKey].state ~= STATE_IDLE then
+        self:TransitionTo(expireKey, STATE_IDLE)
     end
 end
 

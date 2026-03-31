@@ -5,8 +5,12 @@
 ### New Features
 * (API) Add layout config endpoints — `DandersFrames_GetPartyConfig()` and `DandersFrames_GetRaidConfig()` return frame dimensions, scale, spacing, and layout settings for external addon integration
 * (Boss Debuffs) Add Text Scale slider for timer and stack count text
+* (Aura Designer) Add expire sound alert — plays a sound when the longest active buff duration drops below a configurable threshold
+* (Aura Designer) Add collapsible settings groups — indicator settings sections can be collapsed/expanded by clicking the header, with state persisted across sessions
+* (Aura Designer) Add bottom collapse bar to expanded indicator cards and settings groups for quick access
 
 ### Bug Fixes
+* (Frames) Fix IteratePinnedFrames error on roster update caused by function used before declaration
 * (Frames) Fix frames staying stuck as offline after a player reconnects
 * (Grouped Raids) Fix groups briefly overlapping when someone joins the raid
 * (Boss Debuffs) Fix overlay border showing tooltips when it shouldn't

@@ -198,18 +198,35 @@ end
 -- SETTINGS GROUP - Visible container that groups related settings together
 -- Ensures settings never get split across columns
 -- =========================================================================
-function GUI:CreateSettingsGroup(parent, width)
+-- Collapsed state persistence (stored in SavedVariables, survives logout)
+-- Lazily initialized from DandersFramesDB_v2.collapsedGroups on first access
+function GUI:GetCollapsedGroups()
+    if not DandersFramesDB_v2 then return {} end
+    if not DandersFramesDB_v2.collapsedGroups then
+        DandersFramesDB_v2.collapsedGroups = {}
+    end
+    return DandersFramesDB_v2.collapsedGroups
+end
+
+function GUI:CreateSettingsGroup(parent, width, opts)
+    -- opts can be a boolean (legacy: collapsible) or a table { collapsible, showSummary }
+    if type(opts) == "boolean" then opts = { collapsible = opts } end
+    opts = opts or {}
+
     local group = CreateFrame("Frame", nil, parent, "BackdropTemplate")
     group:SetSize(width or 280, 10)  -- Height will be calculated dynamically
     group.groupChildren = {}
     group.isSettingsGroup = true
-    
+    group.collapsible = opts.collapsible or false
+    group.showSummary = opts.showSummary or false
+    group.collapsed = false
+
     -- Visual styling - subtle background and border
     local padding = 10
     local margin = 10  -- Space between groups
     group.padding = padding
     group.margin = margin
-    
+
     if not group.SetBackdrop then Mixin(group, BackdropTemplateMixin) end
     group:SetBackdrop({
         bgFile = "Interface\\Buttons\\WHITE8x8",
@@ -218,7 +235,52 @@ function GUI:CreateSettingsGroup(parent, width)
     })
     group:SetBackdropColor(1, 1, 1, 0.03)  -- Very subtle white background (3% opacity)
     group:SetBackdropBorderColor(1, 1, 1, 0.08)  -- Subtle white border (8% opacity)
-    
+
+    -- Bottom collapse bar (only for collapsible groups, shown when expanded)
+    if group.collapsible then
+        local collapseBar = CreateFrame("Button", nil, group)
+        collapseBar:SetHeight(14)
+        collapseBar:SetPoint("BOTTOMLEFT", group, "BOTTOMLEFT", 1, 1)
+        collapseBar:SetPoint("BOTTOMRIGHT", group, "BOTTOMRIGHT", -1, 1)
+
+        local barBg = collapseBar:CreateTexture(nil, "BACKGROUND")
+        barBg:SetAllPoints()
+        barBg:SetColorTexture(1, 1, 1, 0.03)
+
+        local barIcon = collapseBar:CreateTexture(nil, "OVERLAY")
+        barIcon:SetSize(8, 8)
+        barIcon:SetPoint("CENTER", 0, 0)
+        local mediaPath = "Interface\\AddOns\\DandersFrames\\Media\\Icons\\"
+        barIcon:SetTexture(mediaPath .. "chevron_right")
+        barIcon:SetVertexColor(1, 1, 1, 0.3)
+
+        collapseBar:SetScript("OnEnter", function()
+            barBg:SetColorTexture(1, 1, 1, 0.06)
+            barIcon:SetVertexColor(1, 1, 1, 0.6)
+        end)
+        collapseBar:SetScript("OnLeave", function()
+            barBg:SetColorTexture(1, 1, 1, 0.03)
+            barIcon:SetVertexColor(1, 1, 1, 0.3)
+        end)
+        collapseBar:SetScript("OnClick", function()
+            group.collapsed = true
+            local headerText = group.headerWidget and group.headerWidget.text and group.headerWidget.text:GetText()
+            if headerText then
+                local saved = GUI:GetCollapsedGroups()
+                saved[headerText] = true
+            end
+            if group.collapseArrow then
+                group.collapseArrow:SetTexture(mediaPath .. "chevron_right")
+            end
+            if DF.AuraDesigner_RefreshPage then
+                DF:AuraDesigner_RefreshPage()
+            end
+        end)
+
+        collapseBar:Hide()
+        group.collapseBar = collapseBar
+    end
+
     -- Add a widget to this group
     group.AddWidget = function(self, widget, height)
         widget:SetParent(self)
@@ -228,51 +290,167 @@ function GUI:CreateSettingsGroup(parent, width)
         })
         -- Mark widget as belonging to this group
         widget.settingsGroup = self
+
+        -- If collapsible and this is the first widget (header), set up collapse toggle
+        if self.collapsible and #self.groupChildren == 1 and widget.text then
+            self.headerWidget = widget
+
+            -- Resolve collapsed state: default to expanded unless saved state says collapsed
+            local headerText = widget.text:GetText()
+            local savedStates = GUI:GetCollapsedGroups()
+            if headerText and savedStates[headerText] then
+                self.collapsed = true
+            else
+                self.collapsed = false
+            end
+
+            -- Shift header text right to make room for the arrow icon
+            widget.text:ClearAllPoints()
+            widget.text:SetPoint("BOTTOMLEFT", widget, "BOTTOMLEFT", 14, 2)
+
+            -- Add toggle arrow icon (texture from Media folder)
+            local arrow = widget:CreateTexture(nil, "OVERLAY")
+            arrow:SetSize(10, 10)
+            arrow:SetPoint("RIGHT", widget.text, "LEFT", -2, 0)
+            local mediaPath = "Interface\\AddOns\\DandersFrames\\Media\\Icons\\"
+            arrow:SetTexture(self.collapsed and (mediaPath .. "chevron_right") or (mediaPath .. "expand_more"))
+            local c = GetThemeColor()
+            arrow:SetVertexColor(c.r, c.g, c.b)
+            self.collapseArrow = arrow
+
+            -- Theme listener for arrow color
+            arrow.UpdateTheme = function()
+                local nc = GetThemeColor()
+                arrow:SetVertexColor(nc.r, nc.g, nc.b)
+            end
+            if not parent.ThemeListeners then parent.ThemeListeners = {} end
+            table.insert(parent.ThemeListeners, arrow)
+
+            -- Make the header clickable
+            widget:EnableMouse(true)
+            widget:SetScript("OnMouseDown", function()
+                self.collapsed = not self.collapsed
+                -- Persist collapsed state to SavedVariables
+                if headerText then
+                    local saved = GUI:GetCollapsedGroups()
+                    saved[headerText] = self.collapsed or nil  -- only store true, remove when expanded
+                end
+                arrow:SetTexture(self.collapsed and (mediaPath .. "chevron_right") or (mediaPath .. "expand_more"))
+                -- Refresh the page to recalculate layout
+                if DF.AuraDesigner_RefreshPage then
+                    DF:AuraDesigner_RefreshPage()
+                end
+            end)
+
+            -- Highlight arrow on hover to indicate clickable
+            widget:SetScript("OnEnter", function()
+                arrow:SetVertexColor(1, 1, 1)
+            end)
+            widget:SetScript("OnLeave", function()
+                local nc = GetThemeColor()
+                arrow:SetVertexColor(nc.r, nc.g, nc.b)
+            end)
+        end
+
         return widget
     end
-    
+
     -- Calculate total height based on visible children and layout them
     group.LayoutChildren = function(self)
         local y = -self.padding  -- Start with top padding
         local visibleCount = 0
         local innerWidth = self:GetWidth() - (self.padding * 2)  -- Width for child widgets
-        
-        for _, entry in ipairs(self.groupChildren) do
+
+        for i, entry in ipairs(self.groupChildren) do
             local widget = entry.widget
             local height = entry.height
-            
-            -- Check if widget should be visible
-            local shouldShow = true
-            if widget.hideOn then
-                local db = DF.db[GUI.SelectedMode]
-                if db and widget.hideOn(db) then
-                    shouldShow = false
+
+            -- If collapsed, only show the header (first widget)
+            if self.collapsed and i > 1 then
+                widget:Hide()
+            else
+                -- Check if widget should be visible
+                local shouldShow = true
+                if widget.hideOn then
+                    local db = DF.db[GUI.SelectedMode]
+                    if db and widget.hideOn(db) then
+                        shouldShow = false
+                    end
+                end
+
+                if shouldShow then
+                    widget:ClearAllPoints()
+                    widget:SetPoint("TOPLEFT", self, "TOPLEFT", self.padding, y)
+                    -- Set width to fit within group padding
+                    widget:SetWidth(innerWidth)
+                    widget:Show()
+                    y = y - height
+                    visibleCount = visibleCount + 1
+                else
+                    widget:Hide()
                 end
             end
-            
-            if shouldShow then
-                widget:ClearAllPoints()
-                widget:SetPoint("TOPLEFT", self, "TOPLEFT", self.padding, y)
-                -- Set width to fit within group padding
-                widget:SetWidth(innerWidth)
-                widget:Show()
-                y = y - height
-                visibleCount = visibleCount + 1
+        end
+
+        -- Show/hide collapsed summary and bottom collapse bar
+        if self.collapsible then
+            if self.collapsed then
+                if self.showSummary then
+                    -- Build summary fontstring lazily on first use
+                    if not self.collapseSummary then
+                        self.collapseSummary = self:CreateFontString(nil, "OVERLAY")
+                        self.collapseSummary:SetFont("Fonts\\FRIZQT__.TTF", 9, "")
+                        self.collapseSummary:SetTextColor(C_TEXT.r, C_TEXT.g, C_TEXT.b, 0.5)
+                        self.collapseSummary:SetJustifyH("LEFT")
+                        self.collapseSummary:SetWordWrap(true)
+                    end
+
+                    -- Collect labels from child widgets (skip header at index 1)
+                    local labels = {}
+                    for i = 2, #self.groupChildren do
+                        local w = self.groupChildren[i].widget
+                        -- Scan the widget's regions for a FontString with text
+                        for _, region in ipairs({w:GetRegions()}) do
+                            if region.GetText and region:GetText() and region:GetText() ~= "" then
+                                labels[#labels + 1] = region:GetText()
+                                break
+                            end
+                        end
+                    end
+
+                    local summaryText = table.concat(labels, "  \194\183  ")  -- separated by  ·
+                    self.collapseSummary:SetText(summaryText)
+                    self.collapseSummary:ClearAllPoints()
+                    self.collapseSummary:SetPoint("TOPLEFT", self, "TOPLEFT", self.padding, y)
+                    self.collapseSummary:SetWidth(innerWidth)
+                    self.collapseSummary:Show()
+                    -- Measure actual wrapped height
+                    local summaryHeight = self.collapseSummary:GetStringHeight() or 12
+                    y = y - summaryHeight - 2
+                else
+                    if self.collapseSummary then self.collapseSummary:Hide() end
+                end
+
+                if self.collapseBar then self.collapseBar:Hide() end
             else
-                widget:Hide()
+                if self.collapseSummary then self.collapseSummary:Hide() end
+                if self.collapseBar then
+                    self.collapseBar:Show()
+                    y = y - self.collapseBar:GetHeight()
+                end
             end
         end
-        
+
         -- Update group height (add padding at bottom)
         local totalHeight = math.abs(y) + self.padding
         if totalHeight < 1 then totalHeight = 1 end
         self:SetHeight(totalHeight)
         -- Add margin to calculated height for spacing between groups
         self.calculatedHeight = totalHeight + self.margin
-        
+
         return self.calculatedHeight
     end
-    
+
     -- Process disableOn for children
     group.RefreshChildStates = function(self)
         local db = DF.db[GUI.SelectedMode]
@@ -291,7 +469,7 @@ function GUI:CreateSettingsGroup(parent, width)
             end
         end
     end
-    
+
     return group
 end
 

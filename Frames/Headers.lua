@@ -8,6 +8,9 @@ local addonName, DF = ...
 -- Make addon accessible globally for XML OnLoad
 DandersFrames = DF
 
+-- Forward declaration (defined later, needed by ProcessRosterUpdate)
+local IteratePinnedFrames
+
 -- ============================================================
 -- FRAME-BASED THROTTLING
 -- Delays roster updates to next frame, automatically coalescing
@@ -8202,8 +8205,8 @@ headerChildEventFrame:RegisterEvent("READY_CHECK_CONFIRM")
 headerChildEventFrame:RegisterEvent("READY_CHECK_FINISHED")
 headerChildEventFrame:RegisterEvent("PARTY_LEADER_CHANGED")
 
--- Helper to iterate pinned frame children
-local function IteratePinnedFrames(callback)
+-- Helper to iterate pinned frame children (forward-declared near file top)
+IteratePinnedFrames = function(callback)
     if not DF.PinnedFrames or not DF.PinnedFrames.initialized or not DF.PinnedFrames.headers then
         return
     end
