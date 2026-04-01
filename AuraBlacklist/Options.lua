@@ -20,6 +20,8 @@ function DF.BuildAuraBlacklistPage(guiRef, pageRef, dbRef)
     if pageRef._auraBlacklistBuilt then
         if pageRef._buffWidget then pageRef._buffWidget:Refresh() end
         if pageRef._debuffWidget then pageRef._debuffWidget:Refresh() end
+        if pageRef._customBuffWidget then pageRef._customBuffWidget:Refresh() end
+        if pageRef._customDebuffWidget then pageRef._customDebuffWidget:Refresh() end
         if pageRef._updateDropdownText then pageRef._updateDropdownText() end
         return
     end
@@ -133,11 +135,11 @@ function DF.BuildAuraBlacklistPage(guiRef, pageRef, dbRef)
     end
 
     -- ========== SPELL ROW (unified list item) ==========
-    local function CreateSpellRow(scrollContent, spell, index, rowHeight, blacklistKey, refreshFn)
+    local function CreateSpellRow(scrollContent, spell, index, rowHeight, blacklistKey, refreshFn, keepOnDisable)
         local tc = GetThemeColor()
         local bl = GetBlacklist()
         local entry = bl[blacklistKey] and bl[blacklistKey][spell.spellId]
-        local isBlacklisted = entry ~= nil
+        local isBlacklisted = entry ~= nil and (entry == true or entry.combat or entry.ooc)
 
         local row = CreateFrame("Button", nil, scrollContent, "BackdropTemplate")
         row:SetHeight(rowHeight - 1)
@@ -198,14 +200,14 @@ function DF.BuildAuraBlacklistPage(guiRef, pageRef, dbRef)
             end
             if type(e) == "table" then
                 e.combat = newState
-                if not e.combat and not e.ooc then
+                if not e.combat and not e.ooc and not keepOnDisable then
                     blNow[blacklistKey][spell.spellId] = nil
                 end
             end
             NotifyBlacklistChanged()
             refreshFn()
         end)
-        combatCB:SetPoint("RIGHT", row, "RIGHT", -104, 0)
+        combatCB:SetPoint("RIGHT", row, "RIGHT", keepOnDisable and -128 or -104, 0)
 
         local oocCB = CreateMiniCheckbox(row, "OOC", oocChecked, function(newState)
             local blNow = GetBlacklist()
@@ -219,20 +221,65 @@ function DF.BuildAuraBlacklistPage(guiRef, pageRef, dbRef)
             end
             if type(e) == "table" then
                 e.ooc = newState
-                if not e.combat and not e.ooc then
+                if not e.combat and not e.ooc and not keepOnDisable then
                     blNow[blacklistKey][spell.spellId] = nil
                 end
             end
             NotifyBlacklistChanged()
             refreshFn()
         end)
-        oocCB:SetPoint("RIGHT", row, "RIGHT", -44, 0)
+        oocCB:SetPoint("RIGHT", row, "RIGHT", keepOnDisable and -68 or -44, 0)
+
+        -- Remove button (custom rows only)
+        if keepOnDisable then
+            local removeBtn = CreateFrame("Button", nil, row, "BackdropTemplate")
+            removeBtn:SetSize(20, 20)
+            removeBtn:SetPoint("RIGHT", row, "RIGHT", -6, 0)
+            removeBtn:SetBackdrop({
+                bgFile = "Interface\\Buttons\\WHITE8x8",
+                edgeFile = "Interface\\Buttons\\WHITE8x8",
+                edgeSize = 1,
+            })
+            removeBtn:SetBackdropColor(0.15, 0.06, 0.06, 0.95)
+            removeBtn:SetBackdropBorderColor(0.40, 0.15, 0.15, 1)
+
+            local removeText = removeBtn:CreateFontString(nil, "OVERLAY")
+            removeText:SetFont("Fonts\\FRIZQT__.TTF", 10, "OUTLINE")
+            removeText:SetPoint("CENTER", removeBtn, "CENTER", 1, 1)
+            removeText:SetText("x")
+            removeText:SetTextColor(0.8, 0.3, 0.3)
+
+            removeBtn:SetScript("OnEnter", function(self)
+                self:SetBackdropBorderColor(0.8, 0.2, 0.2, 1)
+                removeText:SetTextColor(1, 0.5, 0.5)
+                GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+                GameTooltip:SetText("Remove from blacklist", 1, 1, 1)
+                GameTooltip:Show()
+            end)
+            removeBtn:SetScript("OnLeave", function(self)
+                self:SetBackdropBorderColor(0.40, 0.15, 0.15, 1)
+                removeText:SetTextColor(0.8, 0.3, 0.3)
+                GameTooltip:Hide()
+            end)
+            removeBtn:SetScript("OnClick", function()
+                local blNow = GetBlacklist()
+                blNow[blacklistKey][spell.spellId] = nil
+                NotifyBlacklistChanged()
+                refreshFn()
+            end)
+        end
 
         -- Click row to toggle blacklist (toggle both on/off)
         row:SetScript("OnClick", function()
             local blNow = GetBlacklist()
-            if blNow[blacklistKey][spell.spellId] then
-                blNow[blacklistKey][spell.spellId] = nil
+            local e = blNow[blacklistKey][spell.spellId]
+            local activelyBlacklisted = e and (e == true or e.combat or e.ooc)
+            if activelyBlacklisted then
+                if keepOnDisable then
+                    blNow[blacklistKey][spell.spellId] = { combat = false, ooc = false }
+                else
+                    blNow[blacklistKey][spell.spellId] = nil
+                end
             else
                 blNow[blacklistKey][spell.spellId] = { combat = true, ooc = true }
             end
@@ -264,7 +311,7 @@ function DF.BuildAuraBlacklistPage(guiRef, pageRef, dbRef)
     end
 
     -- ========== SPELL LIST WIDGET ==========
-    local function CreateSpellListWidget(yAnchorFrame, yOffset, headerText, getSpellsFn, blacklistKey, itemPool)
+    local function CreateSpellListWidget(yAnchorFrame, yOffset, headerText, getSpellsFn, blacklistKey, itemPool, keepOnDisable)
         local ROW_HEIGHT = 28
         local LIST_WIDTH = 480
         local LIST_HEIGHT = 220
@@ -340,7 +387,7 @@ function DF.BuildAuraBlacklistPage(guiRef, pageRef, dbRef)
             scrollContent:SetHeight(math.max(1, #spells * ROW_HEIGHT))
 
             for i, spell in ipairs(spells) do
-                local row = CreateSpellRow(scrollContent, spell, i, ROW_HEIGHT, blacklistKey, Refresh)
+                local row = CreateSpellRow(scrollContent, spell, i, ROW_HEIGHT, blacklistKey, Refresh, keepOnDisable)
                 tinsert(itemPool, row)
             end
         end
@@ -503,4 +550,171 @@ function DF.BuildAuraBlacklistPage(guiRef, pageRef, dbRef)
         GetAllDebuffs, "debuffs", debuffItemPool
     )
     page._debuffWidget = debuffWidget
+
+    -- ========== CUSTOM SPELL ID SECTION ==========
+
+    -- Build lookup sets for preset spell IDs so custom entries can be identified
+    local presetBuffIDs = {}
+    local presetDebuffIDs = {}
+    if DF.AuraBlacklist then
+        if DF.AuraBlacklist.BuffSpells then
+            for _, spells in pairs(DF.AuraBlacklist.BuffSpells) do
+                for _, spell in ipairs(spells) do
+                    presetBuffIDs[spell.spellId] = true
+                end
+            end
+        end
+        if DF.AuraBlacklist.DebuffSpells then
+            for _, spell in ipairs(DF.AuraBlacklist.DebuffSpells) do
+                presetDebuffIDs[spell.spellId] = true
+            end
+        end
+    end
+
+    local function GetSpellDisplayData(spellId)
+        local info = C_Spell and C_Spell.GetSpellInfo and C_Spell.GetSpellInfo(spellId)
+        if info and info.name then return info.name, info.iconID end
+        return nil, nil
+    end
+
+    local function GetCustomEntries(blacklistKey, presetIDs)
+        local bl = GetBlacklist()
+        local result = {}
+        for spellId in pairs(bl[blacklistKey]) do
+            if not presetIDs[spellId] then
+                local name, icon = GetSpellDisplayData(spellId)
+                result[#result + 1] = {
+                    spellId = spellId,
+                    display = name or "Unknown (" .. tostring(spellId) .. ")",
+                    icon = icon or 134400,
+                }
+            end
+        end
+        table.sort(result, function(a, b) return a.display < b.display end)
+        return result
+    end
+
+    local customBuffItemPool = {}
+    local customDebuffItemPool = {}
+    local customBuffWidget, customDebuffWidget
+
+    local function RefreshCustomLists()
+        if customBuffWidget then customBuffWidget:Refresh() end
+        if customDebuffWidget then customDebuffWidget:Refresh() end
+    end
+
+    -- Input container
+    local tc = GetThemeColor()
+    local INPUT_WIDTH = 480
+
+    local inputContainer = CreateFrame("Frame", nil, parent)
+    inputContainer:SetSize(INPUT_WIDTH, 80)
+    inputContainer:SetPoint("TOPLEFT", debuffWidget, "BOTTOMLEFT", 0, -20)
+
+    local inputHeader = inputContainer:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    inputHeader:SetPoint("TOPLEFT", 0, 0)
+    inputHeader:SetText("CUSTOM SPELL IDs")
+    inputHeader:SetTextColor(tc.r, tc.g, tc.b)
+
+    local inputBg = CreateFrame("Frame", nil, inputContainer, "BackdropTemplate")
+    inputBg:SetPoint("TOPLEFT", 0, -18)
+    inputBg:SetSize(INPUT_WIDTH, 46)
+    inputBg:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    inputBg:SetBackdropColor(0.06, 0.06, 0.06, 0.95)
+    inputBg:SetBackdropBorderColor(0.20, 0.20, 0.20, 1)
+
+    -- Edit box
+    local editBox = CreateFrame("EditBox", nil, inputBg, "BackdropTemplate")
+    editBox:SetSize(180, 24)
+    editBox:SetPoint("TOPLEFT", 8, -11)
+    editBox:SetBackdrop({
+        bgFile = "Interface\\Buttons\\WHITE8x8",
+        edgeFile = "Interface\\Buttons\\WHITE8x8",
+        edgeSize = 1,
+    })
+    editBox:SetBackdropColor(0.10, 0.10, 0.10, 1)
+    editBox:SetBackdropBorderColor(0.30, 0.30, 0.30, 1)
+    editBox:SetAutoFocus(false)
+    editBox:SetNumeric(true)
+    editBox:SetMaxLetters(10)
+    editBox:SetFontObject("GameFontHighlightSmall")
+    editBox:SetTextInsets(6, 6, 0, 0)
+
+    local placeholder = editBox:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    placeholder:SetPoint("LEFT", editBox, "LEFT", 8, 0)
+    placeholder:SetText("Enter Spell ID...")
+    editBox:SetScript("OnTextChanged", function(self) placeholder:SetShown(self:GetText() == "") end)
+    editBox:SetScript("OnEditFocusGained", function() placeholder:Hide() end)
+    editBox:SetScript("OnEditFocusLost", function(self) placeholder:SetShown(self:GetText() == "") end)
+
+    -- Add buttons
+    local function CreateAddButton(label, xOffset, blacklistKey)
+        local btn = CreateFrame("Button", nil, inputBg, "BackdropTemplate")
+        btn:SetSize(120, 24)
+        btn:SetPoint("LEFT", editBox, "RIGHT", xOffset, 0)
+        btn:SetBackdrop({
+            bgFile = "Interface\\Buttons\\WHITE8x8",
+            edgeFile = "Interface\\Buttons\\WHITE8x8",
+            edgeSize = 1,
+        })
+        btn:SetBackdropColor(0.12, 0.12, 0.12, 0.95)
+        btn:SetBackdropBorderColor(tc.r * 0.5, tc.g * 0.5, tc.b * 0.5, 1)
+
+        local btnText = btn:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+        btnText:SetAllPoints()
+        btnText:SetText(label)
+        btnText:SetTextColor(tc.r, tc.g, tc.b)
+
+        btn:SetScript("OnEnter", function(self) self:SetBackdropBorderColor(tc.r, tc.g, tc.b, 1) end)
+        btn:SetScript("OnLeave", function(self) self:SetBackdropBorderColor(tc.r * 0.5, tc.g * 0.5, tc.b * 0.5, 1) end)
+        btn:SetScript("OnClick", function()
+            local spellId = tonumber(editBox:GetText())
+            if not spellId or spellId <= 0 then return end
+            local name = GetSpellDisplayData(spellId)
+            if not name then
+                StaticPopupDialogs["DF_INVALID_SPELL_ID"] = {
+                    text = "Spell ID |cFFFFFFFF" .. spellId .. "|r could not be found. Please check the ID and try again.",
+                    button1 = "OK",
+                    timeout = 0,
+                    whileDead = true,
+                    hideOnEscape = true,
+                    preferredIndex = 3,
+                }
+                StaticPopup_Show("DF_INVALID_SPELL_ID")
+                return
+            end
+            local bl = GetBlacklist()
+            if not bl[blacklistKey][spellId] then
+                bl[blacklistKey][spellId] = { combat = true, ooc = true }
+                NotifyBlacklistChanged()
+                RefreshCustomLists()
+            end
+            editBox:SetText("")
+            placeholder:Show()
+        end)
+
+        return btn
+    end
+
+    CreateAddButton("Add as Buff", 8, "buffs")
+    CreateAddButton("Add as Debuff", 136, "debuffs")
+
+    -- Custom entry lists
+    customBuffWidget = CreateSpellListWidget(
+        inputContainer, -10, "CUSTOM BUFF BLACKLIST",
+        function() return GetCustomEntries("buffs", presetBuffIDs) end,
+        "buffs", customBuffItemPool, true
+    )
+    page._customBuffWidget = customBuffWidget
+
+    customDebuffWidget = CreateSpellListWidget(
+        customBuffWidget, -20, "CUSTOM DEBUFF BLACKLIST",
+        function() return GetCustomEntries("debuffs", presetDebuffIDs) end,
+        "debuffs", customDebuffItemPool, true
+    )
+    page._customDebuffWidget = customDebuffWidget
 end
